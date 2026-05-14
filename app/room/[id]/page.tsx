@@ -291,7 +291,7 @@ function RoomContent() {
             </div>
             <div
               className={`transition-all duration-200 shrink-0 ${
-                !showChat || isChatMinimized ? "w-0 overflow-hidden border-0" : "w-80 lg:w-96"
+                !showChat || isChatMinimized ? "w-0 overflow-hidden border-0" : "w-[22rem] lg:w-[26rem]"
               }`}
             >
               <ChatPanel {...chatPanelProps} />

@@ -2,6 +2,7 @@
 
 import { ChatMessage } from "@/lib/types";
 import { formatTime, getAvatarColor, getInitials } from "@/lib/utils";
+import { isEmojiOnly } from "@/lib/emojis";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -23,14 +24,12 @@ function Avatar({ username, avatar }: { username: string; avatar?: string }) {
       <img
         src={avatar}
         alt={username}
-        className="w-8 h-8 rounded-full object-cover shrink-0 border border-gray-700/50 shadow-sm"
+        className="chat-avatar object-cover"
       />
     );
   }
   return (
-    <div
-      className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-xs font-bold text-white bg-gradient-to-br ${getAvatarColor(username)} border border-white/10 shadow-sm`}
-    >
+    <div className={`chat-avatar bg-gradient-to-br ${getAvatarColor(username)}`}>
       {getInitials(username)}
     </div>
   );
@@ -45,68 +44,59 @@ export default function MessageBubble({
 
   if (isSystem) {
     return (
-      <div className="flex justify-center my-3 message-enter">
-        <div className="text-xs text-gray-400 bg-white/5 px-4 py-1.5 rounded-full border border-white/10">
-          {message.content}
-        </div>
+      <div className="chat-row chat-row--system message-enter">
+        <span className="chat-bubble-system">{message.content}</span>
       </div>
     );
   }
 
   return (
-    <div
-      className={`flex mb-3 message-enter ${
-        isOwn ? "justify-end" : "justify-start"
-      }`}
-    >
-      <div
-        className={`flex gap-2.5 max-w-[88%] ${
-          isOwn ? "flex-row-reverse" : "flex-row"
-        }`}
-      >
-        <div className="flex-shrink-0 mt-0.5">
+    <div className={`chat-row message-enter ${isOwn ? "chat-row--own" : "chat-row--other"}`}>
+      <div className="chat-row-inner">
+        {!isOwn && (
           <Avatar username={message.username} avatar={message.avatar} />
-        </div>
+        )}
 
-        <div>
+        <div className="chat-bubble-wrap">
           {!isOwn && (
             <div
-              className="text-xs font-semibold mb-1 ml-1"
+              className="chat-bubble-name"
               style={{ color: chatColors.otherName }}
             >
               {message.username}
             </div>
           )}
+
           <div
-            className="rounded-xl px-4 py-3 shadow-sm"
+            className={`chat-bubble ${isOwn ? "chat-bubble--own" : "chat-bubble--other"}`}
             style={{
               background: isOwn ? chatColors.own : chatColors.other,
               color: isOwn ? chatColors.ownText : chatColors.otherText,
-              borderTopRightRadius: isOwn ? "4px" : "12px",
-              borderTopLeftRadius: isOwn ? "12px" : "4px",
             }}
           >
             {message.type === "image" ? (
-              <div>
-                <img
-                  src={message.content}
-                  alt="Shared image"
-                  className="max-w-full rounded-lg max-h-52 object-cover"
-                  loading="lazy"
-                />
-              </div>
+              <img
+                src={message.content}
+                alt="Shared image"
+                className="max-w-full rounded-lg max-h-52 object-cover"
+                loading="lazy"
+              />
             ) : (
-              <div className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">
+              <div
+                className={
+                  isEmojiOnly(message.content)
+                    ? "chat-bubble-text chat-bubble-text--emoji"
+                    : "chat-bubble-text"
+                }
+              >
                 {message.content}
               </div>
             )}
-            <div
-              className="text-xs mt-2 flex items-center gap-1"
-              style={{ color: chatColors.time }}
-            >
+
+            <div className="chat-bubble-meta" style={{ color: chatColors.time }}>
               {formatTime(message.timestamp)}
               {isOwn && (
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" opacity={0.7}>
+                <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                   <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                 </svg>
               )}

@@ -15,7 +15,7 @@ export default function TypingIndicator({ names }: TypingIndicatorProps) {
         : `${names[0]} và ${names.length - 1} người khác đang nhập`;
 
   return (
-    <div className="px-4 py-1.5 text-xs opacity-70 flex items-center gap-1.5">
+    <div className="chat-typing flex items-center gap-2">
       <span>{label}</span>
       <span className="inline-flex gap-0.5">
         <span className="typing-dot" />

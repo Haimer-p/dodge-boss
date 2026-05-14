@@ -62,8 +62,8 @@ export default function StealthControls({
 
       {isOpen && (
         <div className="absolute top-full right-0 mt-2 z-50 min-w-[240px]">
-          <div className="glass rounded-xl p-4 shadow-2xl border border-white/10 animate-fade-slide">
-            <div className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">
+          <div className="glass rounded-xl p-5 shadow-2xl border border-white/10 animate-fade-slide">
+            <div className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-4">
               Stealth Mode
             </div>
 

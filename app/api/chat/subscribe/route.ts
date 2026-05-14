@@ -2,6 +2,8 @@ import { Redis } from "@upstash/redis";
 import { ChatMessage } from "@/lib/types";
 import { getActiveTypers } from "@/lib/redis";
 
+const POLL_MS = 500;
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -79,7 +81,7 @@ export async function GET(req: Request) {
         } catch {
           // continue polling
         }
-      }, 1500);
+      }, POLL_MS);
 
       const keepAlive = setInterval(() => {
         try {

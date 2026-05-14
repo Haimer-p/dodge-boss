@@ -82,9 +82,9 @@ export default function ChatSettingsPanel({
   return (
     <div
       ref={panelRef}
-      className="absolute bottom-full right-0 mb-2 w-72 glass rounded-xl border border-white/10 shadow-2xl z-50 p-4 animate-fade-slide"
+      className="absolute bottom-full right-0 mb-2 w-72 glass rounded-xl border border-white/10 shadow-2xl z-50 p-5 animate-fade-slide"
     >
-      <div className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">
+      <div className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-4">
         Chat Appearance
       </div>
 
@@ -126,7 +126,7 @@ export default function ChatSettingsPanel({
         />
       </div>
 
-      <div className="space-y-2.5 mb-4">
+      <div className="space-y-3 mb-5">
         <ColorField
           label="Panel Background"
           value={appearance.panelBg}

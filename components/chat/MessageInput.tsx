@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import EmojiPicker from "./EmojiPicker";
 
 interface MessageInputProps {
   onSend: (content: string, type?: "text" | "image") => void;
@@ -10,7 +11,9 @@ interface MessageInputProps {
 
 export default function MessageInput({ onSend, onTypingChange, disabled }: MessageInputProps) {
   const [content, setContent] = useState("");
+  const [showEmoji, setShowEmoji] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isTypingRef = useRef(false);
@@ -37,7 +40,7 @@ export default function MessageInput({ onSend, onTypingChange, disabled }: Messa
       if (isTypingRef.current) onTypingChange(true);
     }, 2000);
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(stopTyping, 3000);
+    idleTimerRef.current = setTimeout(stopTyping, 2000);
   }, [onTypingChange, stopTyping]);
 
   useEffect(() => () => stopTyping(), [stopTyping]);
@@ -51,10 +54,29 @@ export default function MessageInput({ onSend, onTypingChange, disabled }: Messa
     }
   };
 
+  const insertEmoji = (emoji: string) => {
+    const ta = textareaRef.current;
+    if (ta) {
+      const start = ta.selectionStart ?? content.length;
+      const end = ta.selectionEnd ?? content.length;
+      const next = content.slice(0, start) + emoji + content.slice(end);
+      setContent(next);
+      requestAnimationFrame(() => {
+        ta.focus();
+        const pos = start + emoji.length;
+        ta.setSelectionRange(pos, pos);
+      });
+    } else {
+      setContent((prev) => prev + emoji);
+    }
+    startTyping();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
     stopTyping();
+    setShowEmoji(false);
     onSend(content.trim());
     setContent("");
   };
@@ -79,8 +101,33 @@ export default function MessageInput({ onSend, onTypingChange, disabled }: Messa
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-3 border-t border-white/10">
+    <form onSubmit={handleSubmit} className="chat-input-bar">
       <div className="flex items-end gap-2.5">
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowEmoji((v) => !v)}
+            disabled={disabled}
+            aria-label="Insert emoji"
+            className={`inline-flex items-center justify-center min-w-10 min-h-10 p-2.5 rounded-xl transition-all disabled:opacity-40 ${
+              showEmoji ? "bg-white/15 text-yellow-300" : "text-gray-400 hover:text-gray-200 hover:bg-white/10"
+            }`}
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+              <line x1="9" y1="9" x2="9.01" y2="9" />
+              <line x1="15" y1="9" x2="15.01" y2="9" />
+            </svg>
+          </button>
+          {showEmoji && (
+            <EmojiPicker
+              onSelect={insertEmoji}
+              onClose={() => setShowEmoji(false)}
+            />
+          )}
+        </div>
+
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -98,6 +145,7 @@ export default function MessageInput({ onSend, onTypingChange, disabled }: Messa
 
         <div className="flex-1">
           <textarea
+            ref={textareaRef}
             value={content}
             onChange={(e) => handleContentChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -105,7 +153,7 @@ export default function MessageInput({ onSend, onTypingChange, disabled }: Messa
             placeholder="Type a message..."
             disabled={disabled}
             rows={1}
-            className="textarea-3d w-full"
+            className="textarea-3d textarea-3d-chat w-full"
             style={{ minHeight: "44px", maxHeight: "120px" }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;
