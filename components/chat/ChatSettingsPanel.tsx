@@ -31,7 +31,7 @@ function ColorField({
 
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-xs text-gray-300">{label}</span>
       <div className="flex items-center gap-2">
         <input
           type="color"
@@ -40,7 +40,7 @@ function ColorField({
           className="w-9 h-9 rounded-lg border border-gray-600 cursor-pointer bg-transparent"
           title={label}
         />
-        <span className="text-[10px] font-mono text-gray-500 w-16 truncate">{value}</span>
+        <span className="text-[10px] font-mono text-gray-400 w-16 truncate">{value}</span>
       </div>
     </div>
   );
@@ -111,15 +111,15 @@ export default function ChatSettingsPanel({
   const panel = (
     <div
       ref={panelRef}
-      className="fixed w-72 glass rounded-xl border border-white/10 shadow-2xl z-[200] p-5 animate-fade-slide max-h-[min(80vh,32rem)] overflow-y-auto thin-scrollbar"
+      className="fixed w-72 rounded-xl border border-gray-700/80 bg-[#0f1219]/98 backdrop-blur-xl shadow-2xl shadow-black/50 z-[200] p-5 animate-fade-slide max-h-[min(80vh,32rem)] overflow-y-auto thin-scrollbar"
       style={{ top: position.top, right: position.right }}
     >
-      <div className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-4">
+      <div className="text-xs font-semibold text-gray-200 uppercase tracking-wider mb-4">
         Giao diện chat
       </div>
 
       <div className="mb-4">
-        <div className="text-xs text-gray-400 mb-2">Preset nhanh</div>
+        <div className="text-xs text-gray-300 mb-2">Preset nhanh</div>
         <div className="grid grid-cols-5 gap-2">
           {COLOR_SCHEMES.map((scheme) => (
             <button
@@ -138,15 +138,15 @@ export default function ChatSettingsPanel({
             />
           ))}
         </div>
-        <p className="text-[10px] text-gray-500 mt-2">
-          Chọn <span className="text-gray-400">Stealth</span> để bubble xám, khó bị phát hiện.
+        <p className="text-[10px] text-gray-400 mt-2">
+          Chọn <span className="text-gray-300">Stealth</span> để bubble xám, khó bị phát hiện.
         </p>
       </div>
 
       <div className="mb-4">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs text-gray-400">Độ trong suốt panel</span>
-          <span className="text-xs text-gray-500 font-mono">
+          <span className="text-xs text-gray-300">Độ trong suốt panel</span>
+          <span className="text-xs text-gray-400 font-mono">
             {Math.round(appearance.panelOpacity * 100)}%
           </span>
         </div>

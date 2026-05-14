@@ -71,10 +71,19 @@ export interface TypingUser {
   updatedAt: number;
 }
 
+export interface RoomMemberPresence {
+  userId: string;
+  username: string;
+  avatar?: string;
+  online: boolean;
+  lastSeen: number;
+}
+
 export type RealtimeEvent =
   | { type: "connected" }
   | { type: "message"; payload: ChatMessage }
   | { type: "typing"; payload: { typers: TypingUser[] } }
+  | { type: "presence"; payload: { members: RoomMemberPresence[] } }
   | { type: "caro"; payload: CaroGameState }
   | { type: "chess"; payload: import("./chess-game").ChessGameState }
   | { type: "xiangqi"; payload: import("./xiangqi").XiangqiGameState }

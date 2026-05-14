@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GameChannel } from "@/lib/game-redis";
+import { GameChannel } from "@/lib/realtime-channels";
 
 export function useRoomGame<T extends { version: number }>({
   roomId,

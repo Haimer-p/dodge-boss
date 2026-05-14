@@ -1,30 +1,21 @@
-import { Redis } from "@upstash/redis";
-import { ChatMessage, RoomListItem, TypingUser, CaroGameState } from "./types";
+import "server-only";
+
+import { getKvRedis, KvRedis } from "./redis-store";
+import {
+  ChatMessage,
+  RoomListItem,
+  TypingUser,
+  RoomMemberPresence,
+  CaroGameState,
+} from "./types";
 import { createInitialCaroState, normalizeCaroState } from "./caro";
 
 const ROOM_INDEX_KEY = "rooms:index";
 
-function getRedis() {
-  const url =
-    process.env.UPSTASH_REDIS_REST_URL ||
-    process.env.UPSTASH_REDIS_URL;
-  const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN ||
-    process.env.UPSTASH_REDIS_TOKEN;
+const redis = () => getKvRedis();
 
-  if (!url || !token) {
-    throw new Error(
-      "Missing Upstash Redis environment variables"
-    );
-  }
-
-  return new Redis({ url, token });
-}
-
-const redis = () => getRedis();
-
-export function getRedisClient(): Redis {
-  return getRedis();
+export function getRedisClient(): KvRedis {
+  return getKvRedis();
 }
 
 // Room methods
@@ -77,7 +68,7 @@ async function scanRoomIds(): Promise<string[]> {
   } while (cursor !== 0);
 
   if (ids.length > 0) {
-    await redis().sadd(ROOM_INDEX_KEY, ids);
+    await redis().sadd(ROOM_INDEX_KEY, ...ids);
   }
 
   return ids;
@@ -206,6 +197,119 @@ export async function getActiveTypers(
   }
 
   return typers;
+}
+
+function presenceKey(roomId: string): string {
+  return `room:${roomId}:presence`;
+}
+
+export async function upsertPresence(
+  roomId: string,
+  userId: string,
+  username: string,
+  avatar?: string
+): Promise<void> {
+  const payload: RoomMemberPresence = {
+    userId,
+    username,
+    avatar,
+    online: true,
+    lastSeen: Date.now(),
+  };
+  await redis().hset(presenceKey(roomId), {
+    [userId]: JSON.stringify(payload),
+  });
+}
+
+export async function markPresenceOffline(
+  roomId: string,
+  userId: string
+): Promise<void> {
+  const raw = await redis().hget(presenceKey(roomId), userId);
+  const now = Date.now();
+  let payload: RoomMemberPresence;
+
+  if (raw) {
+    try {
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      payload = {
+        userId,
+        username: parsed.username || "Someone",
+        avatar: parsed.avatar,
+        online: false,
+        lastSeen: now,
+      };
+    } catch {
+      payload = {
+        userId,
+        username: "Someone",
+        online: false,
+        lastSeen: now,
+      };
+    }
+  } else {
+    payload = {
+      userId,
+      username: "Someone",
+      online: false,
+      lastSeen: now,
+    };
+  }
+
+  await redis().hset(presenceKey(roomId), {
+    [userId]: JSON.stringify(payload),
+  });
+}
+
+export async function getRoomPresence(
+  roomId: string,
+  options?: { onlineTtlMs?: number; memberTtlMs?: number }
+): Promise<RoomMemberPresence[]> {
+  const onlineTtlMs = options?.onlineTtlMs ?? 45_000;
+  const memberTtlMs = options?.memberTtlMs ?? 86_400_000;
+
+  const raw = await redis().hgetall<Record<string, string>>(presenceKey(roomId));
+  if (!raw) return [];
+
+  const now = Date.now();
+  const members: RoomMemberPresence[] = [];
+  const staleIds: string[] = [];
+
+  for (const [uid, value] of Object.entries(raw)) {
+    try {
+      const parsed = typeof value === "string" ? JSON.parse(value) : value;
+      const lastSeen = Number(parsed.lastSeen) || 0;
+
+      if (now - lastSeen > memberTtlMs) {
+        staleIds.push(uid);
+        continue;
+      }
+
+      const flaggedOnline = parsed.online !== false;
+      const isOnline = flaggedOnline && now - lastSeen <= onlineTtlMs;
+
+      members.push({
+        userId: uid,
+        username: parsed.username || "Someone",
+        avatar: parsed.avatar,
+        online: isOnline,
+        lastSeen,
+      });
+    } catch {
+      staleIds.push(uid);
+    }
+  }
+
+  if (staleIds.length > 0) {
+    await redis().hdel(presenceKey(roomId), ...staleIds);
+  }
+
+  members.sort((a, b) => {
+    if (a.online !== b.online) return a.online ? -1 : 1;
+    return b.lastSeen - a.lastSeen;
+  });
+
+  return members;
 }
 
 function caroKey(roomId: string): string {

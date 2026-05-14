@@ -1,13 +1,10 @@
+import "server-only";
+
 import { getRedisClient } from "./redis";
+import { GameChannel } from "./realtime-channels";
 
-export type GameChannel = "caro" | "chess" | "xiangqi" | "bowling";
-
-export const GAME_CHANNELS: GameChannel[] = [
-  "caro",
-  "chess",
-  "xiangqi",
-  "bowling",
-];
+export type { GameChannel } from "./realtime-channels";
+export { GAME_CHANNELS, readVersion } from "./realtime-channels";
 
 export function gameRedisKey(roomId: string, channel: GameChannel): string {
   return `room:${roomId}:${channel}`;
@@ -50,11 +47,4 @@ export async function broadcastGameEvent(
     JSON.stringify({ type: channel, payload })
   );
   await redis.ltrim(notifyKey, -100, -1);
-}
-
-export function readVersion(state: unknown): number {
-  if (state && typeof state === "object" && "version" in state) {
-    return Number((state as { version: number }).version) || 0;
-  }
-  return 0;
 }

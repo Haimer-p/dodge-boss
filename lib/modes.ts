@@ -1,7 +1,7 @@
 import { DisguiseMode } from "./types";
 
 export const WORK_MODES: { id: DisguiseMode; label: string }[] = [
-  { id: "document", label: "Docs" },
+  { id: "document", label: "Wiki" },
   { id: "code-editor", label: "Code" },
   { id: "terminal", label: "Terminal" },
   { id: "kanban", label: "Board" },

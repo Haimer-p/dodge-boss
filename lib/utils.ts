@@ -33,7 +33,7 @@ export function formatTime(timestamp: number): string {
 
 export function getDisguiseLabel(mode: DisguiseMode): string {
   const labels: Record<DisguiseMode, string> = {
-    document: "Google Docs - Draft Review",
+    document: "Notion — Room Workspace",
     "code-editor": "VS Code - Code Review",
     terminal: "Terminal - Build Log",
     kanban: "Jira - Sprint Board",
@@ -83,7 +83,7 @@ export function getInitials(name: string): string {
 // Stealth: get status bar text per disguise mode
 export function getStatusText(mode: DisguiseMode): string {
   const map: Record<DisguiseMode, string> = {
-    document: "Auto-saved",
+    document: "Synced",
     "code-editor": "Line 42, Col 8",
     terminal: "PID: 1337",
     kanban: "Sprint: Active",
