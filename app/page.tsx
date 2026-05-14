@@ -1,13 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DisguiseMode } from "@/lib/types";
 import ModeSelector from "@/components/modes/ModeSelector";
+import ModeIcon from "@/components/modes/ModeIcon";
 import Modal from "@/components/ui/Modal";
 import PetCompanion from "@/components/ui/PetCompanion";
 import ParticleBackground from "@/components/ui/ParticleBackground";
 import { getAvatarColor, getInitials } from "@/lib/utils";
+
+interface RoomHistoryEntry {
+  roomId: string;
+  roomName: string;
+  lastAccessed: number;
+  disguiseMode: DisguiseMode;
+}
 
 function LandingContent() {
   const router = useRouter();
@@ -22,9 +30,21 @@ function LandingContent() {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [roomHistory, setRoomHistory] = useState<RoomHistoryEntry[]>([]);
+  const [createdRoomInfo, setCreatedRoomInfo] = useState<{ id: string; password: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Pre-fill room ID from URL query param ?join=xxx
+  // Load room history
+  useEffect(() => {
+    const history = localStorage.getItem("dodgeboss:rooms");
+    if (history) {
+      try {
+        setRoomHistory(JSON.parse(history));
+      } catch {}
+    }
+  }, []);
+
+  // Pre-fill room ID from URL
   useEffect(() => {
     const joinRoomId = searchParams.get("join");
     if (joinRoomId) {
@@ -32,6 +52,21 @@ function LandingContent() {
       setShowJoinModal(true);
     }
   }, [searchParams]);
+
+  const saveRoomToHistory = useCallback((rid: string, rname: string, mode: DisguiseMode) => {
+    const entry: RoomHistoryEntry = {
+      roomId: rid,
+      roomName: rname,
+      lastAccessed: Date.now(),
+      disguiseMode: mode,
+    };
+    setRoomHistory((prev) => {
+      const filtered = prev.filter((r) => r.roomId !== rid);
+      const updated = [entry, ...filtered].slice(0, 10); // keep last 10
+      localStorage.setItem("dodgeboss:rooms", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -63,6 +98,7 @@ function LandingContent() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setCreatedRoomInfo(null);
     if (!validateUsername()) return;
     if (!roomName.trim()) {
       setError("Please enter a workspace name");
@@ -97,8 +133,15 @@ function LandingContent() {
         return;
       }
 
+      // Save to history
+      saveRoomToHistory(generatedId, roomName, disguiseMode);
       createSession(generatedId);
-      router.push(`/room/${generatedId}?mode=${disguiseMode}`);
+
+      // Show room info briefly before redirect
+      setCreatedRoomInfo({ id: generatedId, password });
+      setTimeout(() => {
+        router.push(`/room/${generatedId}?mode=${disguiseMode}`);
+      }, 2000);
     } catch {
       setError("Failed to create workspace. Please try again.");
     } finally {
@@ -111,7 +154,7 @@ function LandingContent() {
     setError("");
     if (!validateUsername()) return;
     if (!roomId.trim()) {
-      setError("Please enter a Room ID");
+      setError("Please enter the Room ID");
       return;
     }
     if (!password.trim()) {
@@ -133,6 +176,7 @@ function LandingContent() {
         return;
       }
 
+      saveRoomToHistory(roomId.trim(), data.roomName || roomId.trim(), disguiseMode);
       createSession(roomId.trim());
       router.push(`/room/${roomId.trim()}?mode=${disguiseMode}`);
     } catch {
@@ -142,21 +186,23 @@ function LandingContent() {
     }
   };
 
+  const handleHistoryClick = (entry: RoomHistoryEntry) => {
+    setRoomId(entry.roomId);
+    setDisguiseMode(entry.disguiseMode);
+    setShowJoinModal(true);
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-mesh p-4 relative overflow-hidden">
       <ParticleBackground />
       <PetCompanion />
 
-      <div
-        className="absolute inset-0 z-[1] opacity-[0.03]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }}
-      />
+      <div className="absolute inset-0 z-[1] opacity-[0.03]" style={{
+        backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+        backgroundSize: "40px 40px",
+      }} />
 
-      <div className="max-w-md w-full space-y-6 relative z-10">
+      <div className="max-w-md w-full flex flex-col gap-8 relative z-10">
         {/* Logo / Title */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/20 mb-4 animate-float">
@@ -169,8 +215,8 @@ function LandingContent() {
         </div>
 
         {/* Disguise Mode Selector */}
-        <div className="glass rounded-2xl p-5 space-y-3 shadow-xl shadow-blue-500/5">
-          <label className="text-[10px] font-semibold text-blue-200/80 uppercase tracking-widest flex items-center gap-2">
+        <div className="glass rounded-2xl p-5 flex flex-col gap-4 shadow-xl shadow-black/20">
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
             </svg>
@@ -180,26 +226,48 @@ function LandingContent() {
         </div>
 
         {/* Actions */}
-        <div className="space-y-3">
-          <button
-            onClick={() => {
-              setError("");
-              setShowJoinModal(true);
-            }}
-            className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-medium transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 active:scale-[0.98]"
-          >
+        <div className="flex flex-col gap-4">
+          <button onClick={() => { setError(""); setShowJoinModal(true); }}
+            className="w-full py-3.5 px-4 bg-white text-gray-900 hover:bg-gray-100 rounded-xl font-medium transition-all shadow-lg active:scale-[0.98]">
             Join Workspace
           </button>
-          <button
-            onClick={() => {
-              setError("");
-              setShowCreateModal(true);
-            }}
-            className="w-full py-3 px-4 glass hover:bg-white/20 text-gray-200 hover:text-white rounded-xl font-medium transition-all border border-white/10 active:scale-[0.98]"
-          >
+          <button onClick={() => { setError(""); setShowCreateModal(true); }}
+            className="w-full py-3.5 px-4 glass hover:bg-white/10 text-gray-200 hover:text-white rounded-xl font-medium transition-all border border-white/15 active:scale-[0.98]">
             Create New Workspace
           </button>
         </div>
+
+        {/* Room History */}
+        {roomHistory.length > 0 && (
+          <div className="glass rounded-xl p-4 space-y-2">
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+              </svg>
+              Recent Workspaces
+            </div>
+            <div className="space-y-1">
+              {roomHistory.map((entry) => (
+                <button
+                  key={entry.roomId}
+                  onClick={() => handleHistoryClick(entry)}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-left group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-300">
+                    <ModeIcon mode={entry.disguiseMode} className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-gray-200 truncate font-medium">{entry.roomName}</div>
+                    <div className="text-[10px] text-gray-600 font-mono truncate">{entry.roomId}</div>
+                  </div>
+                  <div className="text-[10px] text-gray-600 group-hover:text-gray-400 transition-colors">
+                    Join
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="text-center">
           <p className="text-xs text-blue-300/40">Click the companion for a morale boost!</p>
@@ -207,98 +275,97 @@ function LandingContent() {
       </div>
 
       {/* Create Modal */}
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create Workspace">
-        <form onSubmit={handleCreate} className="space-y-3">
-          {/* Avatar upload */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="relative w-14 h-14 rounded-full overflow-hidden bg-gray-800 border-2 border-dashed border-gray-600 hover:border-blue-500 transition-colors group"
-            >
-              {avatar ? (
-                <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-500 group-hover:text-blue-400 transition-colors">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                </div>
-              )}
-            </button>
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-400 mb-1">Your Nickname</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. developer_01"
-                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
+      <Modal isOpen={showCreateModal} onClose={() => { setShowCreateModal(false); setCreatedRoomInfo(null); }} title="Create Workspace">
+        {createdRoomInfo ? (
+          <div className="space-y-3 text-center py-4">
+            <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
+              <svg className="w-6 h-6 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
             </div>
+            <p className="text-sm text-green-400 font-medium">Workspace Created!</p>
+            <div className="glass rounded-lg p-3 space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-gray-500">Room ID:</span>
+                <span className="text-blue-300 font-mono font-medium">{createdRoomInfo.id}</span>
+              </div>
+              <div className="flex justify-between text-[11px]">
+                <span className="text-gray-500">Password:</span>
+                <span className="text-yellow-300 font-mono">{createdRoomInfo.password}</span>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-500">Share the Room ID and password with your teammate</p>
+            <div className="text-[10px] text-gray-600 animate-pulse">Redirecting to workspace...</div>
           </div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleAvatarUpload}
-            accept="image/*"
-            className="hidden"
-          />
+        ) : (
+          <form onSubmit={handleCreate} className="space-y-3">
+            {/* Avatar + Nickname */}
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => fileInputRef.current?.click()}
+                className="relative w-14 h-14 rounded-full overflow-hidden bg-gray-800 border-2 border-dashed border-gray-600 hover:border-blue-500 transition-colors group shrink-0">
+                {avatar ? (
+                  <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-500 group-hover:text-blue-400 transition-colors">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                      <circle cx="12" cy="13" r="4" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+              <div className="flex-1">
+                <label className="block text-[11px] font-medium text-gray-400 mb-1">Your Nickname</label>
+                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
+                  placeholder="e.g. developer_01"
+                  className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
+              </div>
+            </div>
+            <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
 
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">Workspace Name</label>
-            <input
-              type="text"
-              value={roomName}
-              onChange={(e) => setRoomName(e.target.value)}
-              placeholder="e.g. Auth Service Review"
-              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">Room ID (optional)</label>
-            <input
-              type="text"
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              placeholder="leave blank for auto"
-              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="minimum 4 characters"
-              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-          {error && (
-            <p className="text-xs text-red-400 bg-red-900/30 px-3 py-2 rounded border border-red-800/50">{error}</p>
-          )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg text-sm font-medium transition-all disabled:cursor-not-allowed"
-          >
-            {loading ? "Creating..." : "Create Workspace"}
-          </button>
-        </form>
+            <div>
+              <label className="block text-[11px] font-medium text-gray-400 mb-1">Workspace Name</label>
+              <input type="text" value={roomName} onChange={(e) => setRoomName(e.target.value)}
+                placeholder="e.g. Auth Service Review"
+                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-medium text-gray-400 mb-1">
+                Room ID
+                <span className="text-gray-600 font-normal ml-1">(leave blank for auto-generate)</span>
+              </label>
+              <input type="text" value={roomId} onChange={(e) => setRoomId(e.target.value)}
+                placeholder="e.g. auth-review"
+                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all font-mono" />
+              <p className="text-[9px] text-gray-600 mt-1">Share this Room ID with teammates so they can join</p>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-medium text-gray-400 mb-1">Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                placeholder="minimum 4 characters"
+                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
+            </div>
+
+            {error && (
+              <p className="text-xs text-red-400 bg-red-900/30 px-3 py-2 rounded border border-red-800/50">{error}</p>
+            )}
+
+            <button type="submit" disabled={loading}
+              className="w-full py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg text-sm font-medium transition-all disabled:cursor-not-allowed active:scale-[0.98]">
+              {loading ? "Creating..." : "Create Workspace"}
+            </button>
+          </form>
+        )}
       </Modal>
 
       {/* Join Modal */}
       <Modal isOpen={showJoinModal} onClose={() => setShowJoinModal(false)} title="Join Workspace">
         <form onSubmit={handleJoin} className="space-y-3">
-          {/* Avatar upload */}
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="relative w-14 h-14 rounded-full overflow-hidden bg-gray-800 border-2 border-dashed border-gray-600 hover:border-blue-500 transition-colors group"
-            >
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              className="relative w-14 h-14 rounded-full overflow-hidden bg-gray-800 border-2 border-dashed border-gray-600 hover:border-blue-500 transition-colors group shrink-0">
               {avatar ? (
                 <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
@@ -311,51 +378,37 @@ function LandingContent() {
               )}
             </button>
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-400 mb-1">Your Nickname</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+              <label className="block text-[11px] font-medium text-gray-400 mb-1">Your Nickname</label>
+              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
                 placeholder="e.g. developer_02"
-                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
+                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
             </div>
           </div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleAvatarUpload}
-            accept="image/*"
-            className="hidden"
-          />
+          <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
+
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">Room ID</label>
-            <input
-              type="text"
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              placeholder="Enter the room ID to join"
-              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            />
+            <label className="block text-[11px] font-medium text-gray-400 mb-1">Room ID</label>
+            <input type="text" value={roomId} onChange={(e) => setRoomId(e.target.value)}
+              placeholder="Enter the Room ID (e.g. auth-review-abc123)"
+              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all font-mono" />
+            <p className="text-[9px] text-gray-600 mt-1">
+              Room ID is the code shown when the workspace was created
+            </p>
           </div>
+
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter room password"
-              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            />
+            <label className="block text-[11px] font-medium text-gray-400 mb-1">Password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter the room password"
+              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
           </div>
+
           {error && (
             <p className="text-xs text-red-400 bg-red-900/30 px-3 py-2 rounded border border-red-800/50">{error}</p>
           )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg text-sm font-medium transition-all disabled:cursor-not-allowed"
-          >
+
+          <button type="submit" disabled={loading}
+            className="w-full py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg text-sm font-medium transition-all disabled:cursor-not-allowed active:scale-[0.98]">
             {loading ? "Joining..." : "Join Workspace"}
           </button>
         </form>

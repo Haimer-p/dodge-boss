@@ -47,7 +47,7 @@ export async function verifyRoom(
 ): Promise<{ name: string } | null> {
   const room = await redis().hgetall<Record<string, string>>(`room:${roomId}:meta`);
   if (!room) return null;
-  if (room.password !== password) return null;
+  if (String(room.password ?? "") !== String(password)) return null;
   return { name: room.name };
 }
 

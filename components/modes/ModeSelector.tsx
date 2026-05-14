@@ -1,34 +1,35 @@
 "use client";
 
 import { DisguiseMode } from "@/lib/types";
+import ModeIcon from "./ModeIcon";
 
 interface ModeSelectorProps {
   selected: DisguiseMode;
   onSelect: (mode: DisguiseMode) => void;
 }
 
-const modes: { id: DisguiseMode; label: string; icon: string }[] = [
-  { id: "document", label: "Docs", icon: "📄" },
-  { id: "code-editor", label: "Code", icon: "💻" },
-  { id: "terminal", label: "Terminal", icon: "⬛" },
-  { id: "kanban", label: "Board", icon: "📋" },
-  { id: "spreadsheet", label: "Sheet", icon: "📊" },
+const modes: { id: DisguiseMode; label: string }[] = [
+  { id: "document", label: "Docs" },
+  { id: "code-editor", label: "Code" },
+  { id: "terminal", label: "Terminal" },
+  { id: "kanban", label: "Board" },
+  { id: "spreadsheet", label: "Sheet" },
 ];
 
 export default function ModeSelector({ selected, onSelect }: ModeSelectorProps) {
   return (
-    <div className="flex gap-1">
+    <div className="flex flex-wrap gap-2">
       {modes.map((mode) => (
         <button
           key={mode.id}
           onClick={() => onSelect(mode.id)}
-          className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all whitespace-nowrap ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${
             selected === mode.id
-              ? "bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/40 shadow-sm shadow-blue-500/10"
-              : "text-gray-500 hover:text-gray-300 hover:bg-gray-800"
+              ? "bg-white/10 text-white ring-1 ring-white/20"
+              : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
           }`}
         >
-          <span className="text-sm leading-none">{mode.icon}</span>
+          <ModeIcon mode={mode.id} className="w-3.5 h-3.5 shrink-0" />
           <span>{mode.label}</span>
         </button>
       ))}
