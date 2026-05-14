@@ -43,6 +43,7 @@ export default function ChatPanel({
   const [appearance, setAppearance] = useState<ChatAppearance>(DEFAULT_CHAT_APPEARANCE);
   const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const settingsAnchorRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const isChatVisibleRef = useRef(isChatVisible);
 
@@ -201,7 +202,7 @@ export default function ChatPanel({
           <span className="text-xs opacity-60">({messages.length})</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative">
+          <div className="relative" ref={settingsAnchorRef}>
             <IconButton
               onClick={() => setShowSettings(!showSettings)}
               aria-label="Chat appearance settings"
@@ -217,6 +218,7 @@ export default function ChatPanel({
               onChange={handleAppearanceChange}
               isOpen={showSettings}
               onClose={() => setShowSettings(false)}
+              anchorRef={settingsAnchorRef}
             />
           </div>
           <span

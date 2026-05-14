@@ -108,5 +108,34 @@ export default function ModeIcon({ mode, className = "w-3.5 h-3.5" }: ModeIconPr
           <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
         </svg>
       );
+    case "arcade":
+      return (
+        <svg {...props}>
+          <rect x="2" y="6" width="20" height="12" rx="2" />
+          <circle cx="8" cy="12" r="2" />
+          <path d="M14 10h6M14 14h4" />
+        </svg>
+      );
+    case "chess":
+      return (
+        <svg {...props}>
+          <path d="M8 3h8v3H8zM7 8h10v2H7zM6 12h12v2H6zM5 16h14v3H5z" />
+        </svg>
+      );
+    case "xiangqi":
+      return (
+        <svg {...props}>
+          <rect x="4" y="3" width="16" height="18" rx="1" />
+          <line x1="4" y1="12" x2="20" y2="12" strokeDasharray="2 2" />
+          <circle cx="12" cy="8" r="2" />
+        </svg>
+      );
+    case "bowling":
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="19" r="2" fill="currentColor" stroke="none" />
+          <path d="M8 6a4 4 0 0 1 8 0v8a4 4 0 0 1-8 0V6z" />
+        </svg>
+      );
   }
 }

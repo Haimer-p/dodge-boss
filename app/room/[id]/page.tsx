@@ -17,6 +17,10 @@ import MusicMode from "@/components/modes/MusicMode";
 import YoutubeMode from "@/components/modes/YoutubeMode";
 import GoogleMode from "@/components/modes/GoogleMode";
 import CaroMode from "@/components/modes/CaroMode";
+import ArcadeMode from "@/components/modes/ArcadeMode";
+import ChessMode from "@/components/modes/ChessMode";
+import XiangqiMode from "@/components/modes/XiangqiMode";
+import BowlingMode from "@/components/modes/BowlingMode";
 import PetCompanion from "@/components/ui/PetCompanion";
 import ParticleBackground from "@/components/ui/ParticleBackground";
 import StealthControls from "@/components/ui/StealthControls";
@@ -198,6 +202,32 @@ function RoomContent() {
       case "caro":
         return (
           <CaroMode
+            roomId={roomId}
+            userId={session.userId}
+            username={session.username}
+          />
+        );
+      case "arcade":
+        return <ArcadeMode />;
+      case "chess":
+        return (
+          <ChessMode
+            roomId={roomId}
+            userId={session.userId}
+            username={session.username}
+          />
+        );
+      case "xiangqi":
+        return (
+          <XiangqiMode
+            roomId={roomId}
+            userId={session.userId}
+            username={session.username}
+          />
+        );
+      case "bowling":
+        return (
+          <BowlingMode
             roomId={roomId}
             userId={session.userId}
             username={session.username}

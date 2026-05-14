@@ -44,6 +44,10 @@ export function getDisguiseLabel(mode: DisguiseMode): string {
     youtube: "YouTube - Tech Tutorials",
     google: "Google Search",
     caro: "Excel - Team Grid",
+    arcade: "Training Modules — Interactive Library",
+    chess: "Strategy Matrix — Sprint Planning",
+    xiangqi: "Cell War — Regional Grid Analysis",
+    bowling: "Lane Metrics — Throughput Simulator",
   };
   return labels[mode];
 }
@@ -89,6 +93,10 @@ export function getStatusText(mode: DisguiseMode): string {
     youtube: "Watching",
     google: "Search ready",
     caro: "Grid active",
+    arcade: "Module loaded",
+    chess: "Strategy session",
+    xiangqi: "War game active",
+    bowling: "Lane open",
   };
   return map[mode];
 }
