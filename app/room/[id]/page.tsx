@@ -21,6 +21,7 @@ import ArcadeMode from "@/components/modes/ArcadeMode";
 import ChessMode from "@/components/modes/ChessMode";
 import XiangqiMode from "@/components/modes/XiangqiMode";
 import BowlingMode from "@/components/modes/BowlingMode";
+import VocabularyMode from "@/components/modes/VocabularyMode";
 import PetCompanion from "@/components/ui/PetCompanion";
 import ParticleBackground from "@/components/ui/ParticleBackground";
 import StealthControls from "@/components/ui/StealthControls";
@@ -233,6 +234,8 @@ function RoomContent() {
             username={session.username}
           />
         );
+      case "vocabulary":
+        return <VocabularyMode />;
       default: return <DocumentMode />;
     }
   };

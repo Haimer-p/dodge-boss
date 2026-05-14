@@ -48,6 +48,7 @@ export function getDisguiseLabel(mode: DisguiseMode): string {
     chess: "Strategy Matrix — Sprint Planning",
     xiangqi: "Cell War — Regional Grid Analysis",
     bowling: "Lane Metrics — Throughput Simulator",
+    vocabulary: "Confluence — Engineering Glossary",
   };
   return labels[mode];
 }
@@ -97,6 +98,7 @@ export function getStatusText(mode: DisguiseMode): string {
     chess: "Strategy session",
     xiangqi: "War game active",
     bowling: "Lane open",
+    vocabulary: "Glossary sync",
   };
   return map[mode];
 }
