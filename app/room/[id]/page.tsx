@@ -190,7 +190,14 @@ function RoomContent() {
 
   const renderMode = () => {
     switch (disguiseMode) {
-      case "document": return <DocumentMode />;
+      case "document":
+        return (
+          <DocumentMode
+            roomId={roomId}
+            userId={session.userId}
+            username={session.username}
+          />
+        );
       case "code-editor": return <CodeEditorMode />;
       case "terminal": return <TerminalMode />;
       case "kanban": return <KanbanMode />;
@@ -236,7 +243,14 @@ function RoomContent() {
         );
       case "vocabulary":
         return <VocabularyMode />;
-      default: return <DocumentMode />;
+      default:
+        return (
+          <DocumentMode
+            roomId={roomId}
+            userId={session.userId}
+            username={session.username}
+          />
+        );
     }
   };
 

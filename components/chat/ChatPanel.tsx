@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChatMessage, ChatAppearance, TypingUser } from "@/lib/types";
+import { ChatMessage, ChatAppearance, TypingUser, RoomMemberPresence } from "@/lib/types";
 import {
   loadChatAppearance,
   saveChatAppearance,
@@ -12,6 +12,7 @@ import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
 import TypingIndicator from "./TypingIndicator";
 import ChatSettingsPanel from "./ChatSettingsPanel";
+import MembersPanel from "./MembersPanel";
 import IconButton from "@/components/ui/IconButton";
 import { createMessage } from "@/lib/utils";
 
@@ -38,10 +39,12 @@ export default function ChatPanel({
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typers, setTypers] = useState<TypingUser[]>([]);
+  const [members, setMembers] = useState<RoomMemberPresence[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [appearance, setAppearance] = useState<ChatAppearance>(DEFAULT_CHAT_APPEARANCE);
   const [showSettings, setShowSettings] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const settingsAnchorRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -84,14 +87,39 @@ export default function ChatPanel({
     [roomId, userId, username]
   );
 
+  const postPresence = useCallback(
+    async (action: "join" | "heartbeat" | "leave") => {
+      const body = JSON.stringify({ roomId, userId, username, avatar, action });
+      try {
+        if (action === "leave" && typeof navigator !== "undefined" && navigator.sendBeacon) {
+          const blob = new Blob([body], { type: "application/json" });
+          navigator.sendBeacon("/api/chat/presence", blob);
+          return;
+        }
+        await fetch("/api/chat/presence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+          keepalive: action === "leave",
+        });
+      } catch {
+        // ignore
+      }
+    },
+    [roomId, userId, username, avatar]
+  );
+
   const connectSSE = useCallback(() => {
     if (eventSourceRef.current) eventSourceRef.current.close();
-    const es = new EventSource(`/api/chat/subscribe?roomId=${roomId}`);
+    const es = new EventSource(
+      `/api/chat/subscribe?roomId=${encodeURIComponent(roomId)}&userId=${encodeURIComponent(userId)}`
+    );
     eventSourceRef.current = es;
 
     es.onopen = () => {
       setIsConnected(true);
       setConnectionError(null);
+      postPresence("join");
     };
     es.onmessage = (event) => {
       try {
@@ -105,6 +133,11 @@ export default function ChatPanel({
           );
           setTypers(others);
           onTypingUpdate?.(others);
+          return;
+        }
+
+        if (data.type === "presence" && data.payload?.members) {
+          setMembers(data.payload.members as RoomMemberPresence[]);
           return;
         }
 
@@ -127,16 +160,30 @@ export default function ChatPanel({
       setTimeout(() => connectSSE(), 3000);
     };
     return es;
-  }, [roomId, userId, onIncomingMessage, onTypingUpdate]);
+  }, [roomId, userId, onIncomingMessage, onTypingUpdate, postPresence]);
 
   useEffect(() => {
     const es = connectSSE();
+    postPresence("join");
+
+    const heartbeat = setInterval(() => {
+      postPresence("heartbeat");
+    }, 20_000);
+
+    const handleLeave = () => postPresence("leave");
+    window.addEventListener("pagehide", handleLeave);
+    window.addEventListener("beforeunload", handleLeave);
+
     return () => {
+      clearInterval(heartbeat);
+      window.removeEventListener("pagehide", handleLeave);
+      window.removeEventListener("beforeunload", handleLeave);
+      postPresence("leave");
       es.close();
       eventSourceRef.current = null;
       postTyping(false);
     };
-  }, [connectSSE, postTyping]);
+  }, [connectSSE, postTyping, postPresence]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -202,9 +249,22 @@ export default function ChatPanel({
           <span className="text-xs opacity-60">({messages.length})</span>
         </div>
         <div className="flex items-center gap-2">
+          <MembersPanel
+            members={members}
+            currentUserId={userId}
+            isOpen={showMembers}
+            onToggle={() => {
+              setShowMembers((v) => !v);
+              setShowSettings(false);
+            }}
+            onClose={() => setShowMembers(false)}
+          />
           <div className="relative" ref={settingsAnchorRef}>
             <IconButton
-              onClick={() => setShowSettings(!showSettings)}
+              onClick={() => {
+                setShowSettings(!showSettings);
+                setShowMembers(false);
+              }}
               aria-label="Chat appearance settings"
               title="Chat appearance settings"
             >

@@ -1,7 +1,7 @@
-import { Redis } from "@upstash/redis";
+import { getKvRedis } from "@/lib/redis-store";
 import { ChatMessage } from "@/lib/types";
-import { getActiveTypers } from "@/lib/redis";
-import { GAME_CHANNELS, readVersion } from "@/lib/game-redis";
+import { getActiveTypers, getRoomPresence } from "@/lib/redis";
+import { REALTIME_CHANNELS, readVersion } from "@/lib/realtime-channels";
 
 const POLL_MS = 500;
 
@@ -12,6 +12,15 @@ function typersSignature(typers: { userId: string; updatedAt: number }[]): strin
   return typers.map((t) => `${t.userId}:${t.updatedAt}`).sort().join("|");
 }
 
+function presenceSignature(
+  members: { userId: string; online: boolean; lastSeen: number }[]
+): string {
+  return members
+    .map((m) => `${m.userId}:${m.online ? 1 : 0}:${m.lastSeen}`)
+    .sort()
+    .join("|");
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const roomId = searchParams.get("roomId");
@@ -20,25 +29,22 @@ export async function GET(req: Request) {
     return new Response("Missing roomId", { status: 400 });
   }
 
-  const url =
-    process.env.UPSTASH_REDIS_REST_URL ||
-    process.env.UPSTASH_REDIS_URL;
-  const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN ||
-    process.env.UPSTASH_REDIS_TOKEN;
-  if (!url || !token) {
+  let redis;
+  try {
+    redis = getKvRedis();
+  } catch {
     return new Response("Server config error", { status: 500 });
   }
 
-  const redis = new Redis({ url, token });
   const encoder = new TextEncoder();
   const NOTIFY_KEY = `room:${roomId}:notify`;
 
   let lastMessageCount = await redis.llen(NOTIFY_KEY);
   let lastTypingSig = "";
+  let lastPresenceSig = "";
   const lastGameVersions: Record<string, number> = {};
 
-  for (const channel of GAME_CHANNELS) {
+  for (const channel of REALTIME_CHANNELS) {
     const raw = await redis.get<string>(`room:${roomId}:${channel}`);
     if (raw) {
       try {
@@ -76,7 +82,9 @@ export async function GET(req: Request) {
                 const data = typeof item === "string" ? JSON.parse(item) : item;
                 if (
                   data?.type &&
-                  GAME_CHANNELS.includes(data.type) &&
+                  REALTIME_CHANNELS.includes(
+                    data.type as (typeof REALTIME_CHANNELS)[number]
+                  ) &&
                   data.payload
                 ) {
                   lastGameVersions[data.type] = readVersion(data.payload);
@@ -99,7 +107,7 @@ export async function GET(req: Request) {
             }
           }
 
-          for (const channel of GAME_CHANNELS) {
+          for (const channel of REALTIME_CHANNELS) {
             const raw = await redis.get<string>(`room:${roomId}:${channel}`);
             if (!raw) continue;
             try {
@@ -125,6 +133,17 @@ export async function GET(req: Request) {
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({ type: "typing", payload: { typers } })}\n\n`
+              )
+            );
+          }
+
+          const members = await getRoomPresence(roomId);
+          const presenceSig = presenceSignature(members);
+          if (presenceSig !== lastPresenceSig) {
+            lastPresenceSig = presenceSig;
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ type: "presence", payload: { members } })}\n\n`
               )
             );
           }
