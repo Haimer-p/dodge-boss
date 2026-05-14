@@ -35,6 +35,17 @@ export async function GET(req: Request) {
 
   let lastMessageCount = await redis.llen(NOTIFY_KEY);
   let lastTypingSig = "";
+  let lastCaroVersion = 0;
+
+  const initialCaro = await redis.get<string>(`room:${roomId}:caro`);
+  if (initialCaro) {
+    try {
+      const parsed = typeof initialCaro === "string" ? JSON.parse(initialCaro) : initialCaro;
+      lastCaroVersion = Number(parsed.version) || 0;
+    } catch {
+      lastCaroVersion = 0;
+    }
+  }
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -58,13 +69,42 @@ export async function GET(req: Request) {
             for (const item of newItems) {
               try {
                 const data = typeof item === "string" ? JSON.parse(item) : item;
+                if (data?.type === "caro" && data.payload) {
+                  lastCaroVersion = Number(data.payload.version) || lastCaroVersion;
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({ type: "caro", payload: data.payload })}\n\n`
+                    )
+                  );
+                  continue;
+                }
                 const msg = data as ChatMessage;
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(msg)}\n\n`)
-                );
+                if (msg.id && msg.content) {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify(msg)}\n\n`)
+                  );
+                }
               } catch {
                 // skip bad messages
               }
+            }
+          }
+
+          const caroRaw = await redis.get<string>(`room:${roomId}:caro`);
+          if (caroRaw) {
+            try {
+              const caroState = typeof caroRaw === "string" ? JSON.parse(caroRaw) : caroRaw;
+              const version = Number(caroState.version) || 0;
+              if (version > lastCaroVersion) {
+                lastCaroVersion = version;
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ type: "caro", payload: caroState })}\n\n`
+                  )
+                );
+              }
+            } catch {
+              // ignore
             }
           }
 

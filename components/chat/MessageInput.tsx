@@ -154,11 +154,13 @@ export default function MessageInput({ onSend, onTypingChange, disabled }: Messa
             disabled={disabled}
             rows={1}
             className="textarea-3d textarea-3d-chat w-full"
-            style={{ minHeight: "44px", maxHeight: "120px" }}
+            style={{ minHeight: "44px", maxHeight: "120px", overflowY: "hidden" }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;
               target.style.height = "auto";
-              target.style.height = Math.min(target.scrollHeight, 120) + "px";
+              const nextHeight = Math.min(target.scrollHeight, 120);
+              target.style.height = nextHeight + "px";
+              target.style.overflowY = target.scrollHeight > 120 ? "auto" : "hidden";
             }}
           />
         </div>

@@ -82,35 +82,40 @@ export default function ChatSettingsPanel({
   return (
     <div
       ref={panelRef}
-      className="absolute bottom-full right-0 mb-2 w-72 glass rounded-xl border border-white/10 shadow-2xl z-50 p-5 animate-fade-slide"
+      className="absolute bottom-full right-0 mb-2 w-72 glass rounded-xl border border-white/10 shadow-2xl z-50 p-5 animate-fade-slide max-h-[min(80vh,32rem)] overflow-y-auto thin-scrollbar"
     >
       <div className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-4">
-        Chat Appearance
+        Giao diện chat
       </div>
 
       <div className="mb-4">
-        <div className="text-xs text-gray-400 mb-2">Theme Presets</div>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="text-xs text-gray-400 mb-2">Preset nhanh</div>
+        <div className="grid grid-cols-5 gap-2">
           {COLOR_SCHEMES.map((scheme) => (
             <button
               key={scheme.id}
               onClick={() => applyPreset(scheme.id)}
               className={`w-9 h-9 rounded-lg border transition-all ${
                 appearance.presetId === scheme.id
-                  ? "ring-2 ring-blue-500 scale-105"
+                  ? scheme.id === "stealth"
+                    ? "ring-2 ring-gray-400 scale-105"
+                    : "ring-2 ring-blue-500 scale-105"
                   : "border-gray-700 hover:border-gray-500"
               }`}
-              title={scheme.name}
+              title={scheme.id === "stealth" ? `${scheme.name} — kín đáo, ít nổi` : scheme.name}
               style={{ background: scheme.own }}
               aria-label={scheme.name}
             />
           ))}
         </div>
+        <p className="text-[10px] text-gray-500 mt-2">
+          Chọn <span className="text-gray-400">Stealth</span> để bubble xám, khó bị phát hiện.
+        </p>
       </div>
 
       <div className="mb-4">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs text-gray-400">Panel Opacity</span>
+          <span className="text-xs text-gray-400">Độ trong suốt panel</span>
           <span className="text-xs text-gray-500 font-mono">
             {Math.round(appearance.panelOpacity * 100)}%
           </span>
@@ -128,39 +133,44 @@ export default function ChatSettingsPanel({
 
       <div className="space-y-3 mb-5">
         <ColorField
-          label="Panel Background"
+          label="Nền panel"
           value={appearance.panelBg}
           onChange={(v) => update({ panelBg: v })}
         />
         <ColorField
-          label="Panel Text"
+          label="Nền vùng tin nhắn"
+          value={appearance.messagesBg}
+          onChange={(v) => update({ messagesBg: v })}
+        />
+        <ColorField
+          label="Chữ panel"
           value={appearance.panelText}
           onChange={(v) => update({ panelText: v })}
         />
         <ColorField
-          label="My Message Text"
+          label="Chữ tin của tôi"
           value={appearance.ownText.startsWith("#") ? appearance.ownText : "#ffffff"}
           onChange={(v) => update({ ownText: v })}
         />
         <ColorField
-          label="Other Message Text"
+          label="Chữ tin người khác"
           value={appearance.otherText.startsWith("#") ? appearance.otherText : "#e5e7eb"}
           onChange={(v) => update({ otherText: v })}
         />
         <ColorField
-          label="My Bubble"
+          label="Bubble của tôi"
           value={appearance.ownBubble.startsWith("#") ? appearance.ownBubble : "#3b82f6"}
           onChange={(v) => update({ ownBubble: v })}
         />
         <ColorField
-          label="Other Bubble"
+          label="Bubble người khác"
           value={appearance.otherBubble.startsWith("#") ? appearance.otherBubble : "#1f2937"}
           onChange={(v) => update({ otherBubble: v })}
         />
       </div>
 
       <Button variant="ghost" fullWidth onClick={handleReset}>
-        Reset to Default
+        Đặt lại mặc định
       </Button>
     </div>
   );

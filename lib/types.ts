@@ -32,7 +32,8 @@ export type DisguiseMode =
   | "dashboard"
   | "music"
   | "youtube"
-  | "google";
+  | "google"
+  | "caro";
 
 export type StealthTheme = "dark" | "light" | "gray";
 
@@ -47,6 +48,7 @@ export interface RoomSession {
 export interface ChatAppearance {
   presetId: string;
   panelBg: string;
+  messagesBg: string;
   panelText: string;
   panelOpacity: number;
   ownBubble: string;
@@ -67,4 +69,29 @@ export interface TypingUser {
 export type RealtimeEvent =
   | { type: "connected" }
   | { type: "message"; payload: ChatMessage }
-  | { type: "typing"; payload: { typers: TypingUser[] } };
+  | { type: "typing"; payload: { typers: TypingUser[] } }
+  | { type: "caro"; payload: CaroGameState };
+
+export type CaroCell = "" | "X" | "O";
+
+export interface CaroPlayer {
+  userId: string;
+  username: string;
+  symbol: "X" | "O";
+}
+
+export type CaroStatus = "waiting" | "playing" | "finished";
+
+export interface CaroGameState {
+  version: number;
+  stones: Record<string, "X" | "O">;
+  /** @deprecated legacy 15×15 — migrated to stones on read */
+  board?: CaroCell[][];
+  players: CaroPlayer[];
+  currentTurn: "X" | "O";
+  winner: "X" | "O" | "draw" | null;
+  winningCells: [number, number][] | null;
+  lastMove: { row: number; col: number; by: "X" | "O" } | null;
+  status: CaroStatus;
+  updatedAt: number;
+}

@@ -6,6 +6,7 @@ import {
   loadChatAppearance,
   saveChatAppearance,
   DEFAULT_CHAT_APPEARANCE,
+  withOpacity,
 } from "@/lib/chat-themes";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
@@ -187,8 +188,7 @@ export default function ChatPanel({
     <div
       className={`w-full md:w-[22rem] lg:w-[26rem] flex flex-col md:border-l border-white/10 backdrop-blur-md h-full ${className}`}
       style={{
-        backgroundColor: appearance.panelBg,
-        opacity: appearance.panelOpacity,
+        backgroundColor: withOpacity(appearance.panelBg, appearance.panelOpacity),
         color: appearance.panelText,
       }}
     >
@@ -228,7 +228,13 @@ export default function ChatPanel({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto chat-messages thin-scrollbar" style={{ scrollBehavior: "smooth" }}>
+      <div
+        className="flex-1 overflow-y-auto chat-messages thin-scrollbar"
+        style={{
+          scrollBehavior: "smooth",
+          backgroundColor: withOpacity(appearance.messagesBg, appearance.panelOpacity),
+        }}
+      >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-3">
