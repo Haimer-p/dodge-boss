@@ -1,139 +1,62 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChatMessage } from "@/lib/types";
+import { ChatMessage, ChatAppearance, TypingUser } from "@/lib/types";
+import {
+  loadChatAppearance,
+  saveChatAppearance,
+  DEFAULT_CHAT_APPEARANCE,
+} from "@/lib/chat-themes";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
+import TypingIndicator from "./TypingIndicator";
+import ChatSettingsPanel from "./ChatSettingsPanel";
+import IconButton from "@/components/ui/IconButton";
 
 interface ChatPanelProps {
   roomId: string;
   userId: string;
   username: string;
   avatar?: string;
+  className?: string;
+  isChatVisible?: boolean;
+  onIncomingMessage?: (msg: ChatMessage) => void;
+  onTypingUpdate?: (typers: TypingUser[]) => void;
 }
 
-interface ChatColorScheme {
-  id: string;
-  name: string;
-  own: string;
-  other: string;
-  ownText: string;
-  otherText: string;
-  ownName: string;
-  otherName: string;
-  time: string;
-}
-
-const COLOR_SCHEMES: ChatColorScheme[] = [
-  {
-    id: "default",
-    name: "Default",
-    own: "linear-gradient(135deg, #3b82f6, #6366f1)",
-    other: "#1f2937",
-    ownText: "#ffffff",
-    otherText: "#e5e7eb",
-    ownName: "#60a5fa",
-    otherName: "#60a5fa",
-    time: "rgba(255,255,255,0.5)",
-  },
-  {
-    id: "mono",
-    name: "Monochrome",
-    own: "#374151",
-    other: "#1f2937",
-    ownText: "#d1d5db",
-    otherText: "#9ca3af",
-    ownName: "#9ca3af",
-    otherName: "#6b7280",
-    time: "rgba(255,255,255,0.25)",
-  },
-  {
-    id: "green",
-    name: "Forest",
-    own: "linear-gradient(135deg, #059669, #10b981)",
-    other: "#064e3b",
-    ownText: "#ffffff",
-    otherText: "#a7f3d0",
-    ownName: "#34d399",
-    otherName: "#34d399",
-    time: "rgba(255,255,255,0.5)",
-  },
-  {
-    id: "purple",
-    name: "Night Sky",
-    own: "linear-gradient(135deg, #7c3aed, #a855f7)",
-    other: "#2e1065",
-    ownText: "#ffffff",
-    otherText: "#e9d5ff",
-    ownName: "#c084fc",
-    otherName: "#c084fc",
-    time: "rgba(255,255,255,0.5)",
-  },
-  {
-    id: "warm",
-    name: "Warm",
-    own: "linear-gradient(135deg, #d97706, #f59e0b)",
-    other: "#451a03",
-    ownText: "#ffffff",
-    otherText: "#fde68a",
-    ownName: "#fbbf24",
-    otherName: "#fbbf24",
-    time: "rgba(255,255,255,0.5)",
-  },
-  {
-    id: "minimal",
-    name: "Minimal",
-    own: "rgba(59,130,246,0.15)",
-    other: "rgba(255,255,255,0.05)",
-    ownText: "#93c5fd",
-    otherText: "#9ca3af",
-    ownName: "#60a5fa",
-    otherName: "#6b7280",
-    time: "rgba(255,255,255,0.2)",
-  },
-  {
-    id: "retro",
-    name: "Retro",
-    own: "#2563eb",
-    other: "#1e293b",
-    ownText: "#ffffff",
-    otherText: "#cbd5e1",
-    ownName: "#3b82f6",
-    otherName: "#94a3b8",
-    time: "rgba(255,255,255,0.4)",
-  },
-  {
-    id: "cyber",
-    name: "Cyber",
-    own: "linear-gradient(135deg, #06b6d4, #22d3ee)",
-    other: "#083344",
-    ownText: "#000000",
-    otherText: "#67e8f9",
-    ownName: "#22d3ee",
-    otherName: "#22d3ee",
-    time: "rgba(255,255,255,0.4)",
-  },
-];
-
-export default function ChatPanel({ roomId, userId, username, avatar }: ChatPanelProps) {
+export default function ChatPanel({
+  roomId,
+  userId,
+  username,
+  avatar,
+  className = "",
+  isChatVisible = true,
+  onIncomingMessage,
+  onTypingUpdate,
+}: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [typers, setTypers] = useState<TypingUser[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [colorScheme, setColorScheme] = useState<ChatColorScheme>(COLOR_SCHEMES[0]);
-  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [appearance, setAppearance] = useState<ChatAppearance>(DEFAULT_CHAT_APPEARANCE);
+  const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const isChatVisibleRef = useRef(isChatVisible);
 
-  // Load saved color scheme
   useEffect(() => {
-    const saved = localStorage.getItem("dodgeboss:chatColor");
-    if (saved) {
-      const found = COLOR_SCHEMES.find((c) => c.id === saved);
-      if (found) setColorScheme(found);
-    }
+    isChatVisibleRef.current = isChatVisible;
+  }, [isChatVisible]);
+
+  useEffect(() => {
+    setAppearance(loadChatAppearance());
   }, []);
 
-  // Load messages
+  const handleAppearanceChange = useCallback((next: ChatAppearance) => {
+    setAppearance(next);
+    saveChatAppearance(next);
+  }, []);
+
   useEffect(() => {
     fetch(`/api/chat/messages?roomId=${roomId}`)
       .then((res) => res.json())
@@ -143,7 +66,21 @@ export default function ChatPanel({ roomId, userId, username, avatar }: ChatPane
       .catch(console.error);
   }, [roomId]);
 
-  // SSE
+  const postTyping = useCallback(
+    async (isTyping: boolean) => {
+      try {
+        await fetch("/api/chat/typing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ roomId, userId, username, isTyping }),
+        });
+      } catch {
+        // ignore
+      }
+    },
+    [roomId, userId, username]
+  );
+
   const connectSSE = useCallback(() => {
     if (eventSourceRef.current) eventSourceRef.current.close();
     const es = new EventSource(`/api/chat/subscribe?roomId=${roomId}`);
@@ -158,11 +95,25 @@ export default function ChatPanel({ roomId, userId, username, avatar }: ChatPane
         if (!event.data) return;
         const data = JSON.parse(event.data);
         if (data.type === "connected" || data.type === "keepalive") return;
-        if (data.id && data.content) {
+
+        if (data.type === "typing" && data.payload?.typers) {
+          const others = (data.payload.typers as TypingUser[]).filter(
+            (t) => t.userId !== userId
+          );
+          setTypers(others);
+          onTypingUpdate?.(others);
+          return;
+        }
+
+        const msg = (data.type === "message" ? data.payload : data) as ChatMessage;
+        if (msg.id && msg.content) {
           setMessages((prev) => {
-            if (prev.some((m) => m.id === data.id)) return prev;
-            return [...prev, data];
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            return [...prev, msg];
           });
+          if (msg.userId !== userId && !isChatVisibleRef.current) {
+            onIncomingMessage?.(msg);
+          }
         }
       } catch {}
     };
@@ -173,22 +124,24 @@ export default function ChatPanel({ roomId, userId, username, avatar }: ChatPane
       setTimeout(() => connectSSE(), 3000);
     };
     return es;
-  }, [roomId]);
+  }, [roomId, userId, onIncomingMessage, onTypingUpdate]);
 
   useEffect(() => {
     const es = connectSSE();
     return () => {
       es.close();
       eventSourceRef.current = null;
+      postTyping(false);
     };
-  }, [connectSSE]);
+  }, [connectSSE, postTyping]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, typers]);
 
   const sendMessage = async (content: string, type: "text" | "image" = "text") => {
     try {
+      await postTyping(false);
       await fetch("/api/chat/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -199,82 +152,71 @@ export default function ChatPanel({ roomId, userId, username, avatar }: ChatPane
     }
   };
 
-  const handleColorChange = (scheme: ChatColorScheme) => {
-    setColorScheme(scheme);
-    localStorage.setItem("dodgeboss:chatColor", scheme.id);
-    setShowColorPicker(false);
+  const chatColors = {
+    own: appearance.ownBubble,
+    other: appearance.otherBubble,
+    ownText: appearance.ownText,
+    otherText: appearance.otherText,
+    ownName: appearance.ownName,
+    otherName: appearance.otherName,
+    time: appearance.timeColor,
   };
 
   return (
-    <div className="w-80 lg:w-96 flex flex-col border-l border-gray-800 bg-gray-900/90 backdrop-blur-md h-full">
-      {/* Header */}
-      <div className="px-3 py-2 border-b border-gray-800 flex items-center justify-between bg-gray-900/60">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+    <div
+      className={`w-full md:w-80 lg:w-96 flex flex-col md:border-l border-white/10 backdrop-blur-md h-full ${className}`}
+      style={{
+        backgroundColor: appearance.panelBg,
+        opacity: appearance.panelOpacity,
+        color: appearance.panelText,
+      }}
+    >
+      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
           </svg>
-          <span className="text-sm font-semibold text-gray-200">Chat</span>
-          <span className="text-[10px] text-gray-600">({messages.length})</span>
+          <span className="text-base font-semibold">Chat</span>
+          <span className="text-xs opacity-60">({messages.length})</span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Color picker */}
           <div className="relative">
-            <button
-              onClick={() => setShowColorPicker(!showColorPicker)}
-              className="w-5 h-5 rounded-full border border-gray-600 hover:border-gray-400 transition-colors overflow-hidden"
-              title="Chat color theme"
-              style={{
-                background: colorScheme.own.includes("gradient")
-                  ? colorScheme.own
-                  : colorScheme.own,
-              }}
+            <IconButton
+              onClick={() => setShowSettings(!showSettings)}
+              aria-label="Chat appearance settings"
+              title="Chat appearance settings"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            </IconButton>
+            <ChatSettingsPanel
+              appearance={appearance}
+              onChange={handleAppearanceChange}
+              isOpen={showSettings}
+              onClose={() => setShowSettings(false)}
             />
-            {showColorPicker && (
-              <div className="absolute bottom-full right-0 mb-2 p-2 glass rounded-xl border border-white/10 shadow-2xl z-50">
-                <div className="text-[10px] text-gray-400 mb-2 font-semibold uppercase tracking-wider px-1">
-                  Color Theme
-                </div>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {COLOR_SCHEMES.map((scheme) => (
-                    <button
-                      key={scheme.id}
-                      onClick={() => handleColorChange(scheme)}
-                      className={`w-7 h-7 rounded-lg border transition-all ${
-                        colorScheme.id === scheme.id
-                          ? "ring-2 ring-blue-500 scale-110"
-                          : "border-gray-700 hover:border-gray-500"
-                      }`}
-                      title={scheme.name}
-                      style={{
-                        background: scheme.own.includes("gradient")
-                          ? scheme.own
-                          : scheme.own,
-                      }}
-                    />
-                  ))}
-                </div>
-                <div className="text-[9px] text-gray-500 mt-1.5 text-center">
-                  {colorScheme.name}
-                </div>
-              </div>
-            )}
           </div>
-          <span className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-400 shadow-sm shadow-green-400/50" : "bg-yellow-400"}`} />
-          <span className="text-[10px] text-gray-500">{isConnected ? "Live" : connectionError || "Offline"}</span>
+          <span
+            className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-green-400 shadow-sm shadow-green-400/50" : "bg-yellow-400"}`}
+          />
+          <span className="text-xs opacity-70">
+            {isConnected ? "Live" : connectionError || "Offline"}
+          </span>
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 hide-scrollbar" style={{ scrollBehavior: "smooth" }}>
+      <div className="flex-1 overflow-y-auto p-4 thin-scrollbar" style={{ scrollBehavior: "smooth" }}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mb-3">
-              <svg className="w-6 h-6 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
+            <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-3">
+              <svg className="w-7 h-7 opacity-40" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z" />
               </svg>
             </div>
-            <p className="text-xs text-gray-600">No messages yet</p>
-            <p className="text-[10px] text-gray-700 mt-1">Send a message to start</p>
+            <p className="text-sm opacity-70">No messages yet</p>
+            <p className="text-xs opacity-50 mt-1">Send a message to start</p>
           </div>
         )}
         {messages.map((msg) => (
@@ -282,22 +224,14 @@ export default function ChatPanel({ roomId, userId, username, avatar }: ChatPane
             key={msg.id}
             message={msg}
             isOwn={msg.userId === userId}
-            chatColors={{
-              own: colorScheme.own,
-              other: colorScheme.other,
-              ownText: colorScheme.ownText,
-              otherText: colorScheme.otherText,
-              ownName: colorScheme.ownName,
-              otherName: colorScheme.otherName,
-              time: colorScheme.time,
-            }}
+            chatColors={chatColors}
           />
         ))}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <MessageInput onSend={sendMessage} />
+      <TypingIndicator names={typers.map((t) => t.username)} />
+      <MessageInput onSend={sendMessage} onTypingChange={postTyping} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { DisguiseMode } from "@/lib/types";
+import { DisguiseMode, RoomListItem } from "@/lib/types";
 import ModeSelector from "@/components/modes/ModeSelector";
 import ModeIcon from "@/components/modes/ModeIcon";
 import Modal from "@/components/ui/Modal";
@@ -32,6 +32,10 @@ function LandingContent() {
   const [loading, setLoading] = useState(false);
   const [roomHistory, setRoomHistory] = useState<RoomHistoryEntry[]>([]);
   const [createdRoomInfo, setCreatedRoomInfo] = useState<{ id: string; password: string } | null>(null);
+  const [allRooms, setAllRooms] = useState<RoomListItem[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRoomName, setSelectedRoomName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load room history
@@ -52,6 +56,23 @@ function LandingContent() {
       setShowJoinModal(true);
     }
   }, [searchParams]);
+
+  const fetchRooms = useCallback(async () => {
+    setRoomsLoading(true);
+    try {
+      const res = await fetch("/api/room/list");
+      const data = await res.json();
+      if (res.ok) setAllRooms(data.rooms ?? []);
+    } catch {
+      // ignore
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRooms();
+  }, [fetchRooms]);
 
   const saveRoomToHistory = useCallback((rid: string, rname: string, mode: DisguiseMode) => {
     const entry: RoomHistoryEntry = {
@@ -139,6 +160,7 @@ function LandingContent() {
 
       // Show room info briefly before redirect
       setCreatedRoomInfo({ id: generatedId, password });
+      fetchRooms();
       setTimeout(() => {
         router.push(`/room/${generatedId}?mode=${disguiseMode}`);
       }, 2000);
@@ -176,7 +198,7 @@ function LandingContent() {
         return;
       }
 
-      saveRoomToHistory(roomId.trim(), data.roomName || roomId.trim(), disguiseMode);
+      saveRoomToHistory(roomId.trim(), data.roomName || selectedRoomName || roomId.trim(), disguiseMode);
       createSession(roomId.trim());
       router.push(`/room/${roomId.trim()}?mode=${disguiseMode}`);
     } catch {
@@ -188,12 +210,40 @@ function LandingContent() {
 
   const handleHistoryClick = (entry: RoomHistoryEntry) => {
     setRoomId(entry.roomId);
+    setSelectedRoomName(entry.roomName);
     setDisguiseMode(entry.disguiseMode);
+    setError("");
     setShowJoinModal(true);
   };
 
+  const handleRoomClick = (room: RoomListItem) => {
+    setRoomId(room.roomId);
+    setSelectedRoomName(room.name);
+    setError("");
+    setPassword("");
+    setShowJoinModal(true);
+  };
+
+  const filteredRooms = allRooms.filter((room) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      room.name.toLowerCase().includes(q) ||
+      room.roomId.toLowerCase().includes(q)
+    );
+  });
+
+  const formatDate = (ts: number) => {
+    if (!ts) return "";
+    return new Date(ts).toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-mesh p-4 relative overflow-hidden">
+    <div className="h-[100dvh] min-h-screen flex flex-col items-center justify-start md:justify-center bg-mesh px-4 py-6 md:py-4 relative overflow-x-hidden overflow-y-auto">
       <ParticleBackground />
       <PetCompanion />
 
@@ -202,7 +252,7 @@ function LandingContent() {
         backgroundSize: "40px 40px",
       }} />
 
-      <div className="max-w-md w-full flex flex-col gap-8 relative z-10">
+      <div className="max-w-xl w-full flex flex-col gap-6 relative z-10">
         {/* Logo / Title */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/20 mb-4 animate-float">
@@ -228,16 +278,92 @@ function LandingContent() {
         {/* Actions */}
         <div className="flex flex-col gap-4">
           <button onClick={() => { setError(""); setShowJoinModal(true); }}
-            className="w-full py-3.5 px-4 bg-white text-gray-900 hover:bg-gray-100 rounded-xl font-medium transition-all shadow-lg active:scale-[0.98]">
+            className="btn-3d btn-3d-primary w-full py-3.5 px-4 text-sm rounded-xl">
             Join Workspace
           </button>
           <button onClick={() => { setError(""); setShowCreateModal(true); }}
-            className="w-full py-3.5 px-4 glass hover:bg-white/10 text-gray-200 hover:text-white rounded-xl font-medium transition-all border border-white/15 active:scale-[0.98]">
+            className="btn-3d btn-3d-secondary w-full py-3.5 px-4 text-sm rounded-xl">
             Create New Workspace
           </button>
         </div>
 
-        {/* Room History */}
+        {/* All Workspaces */}
+        <div className="glass rounded-2xl p-5 shadow-xl shadow-black/20 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+              All Workspaces
+            </div>
+            <button
+              type="button"
+              onClick={fetchRooms}
+              disabled={roomsLoading}
+              className="btn-3d btn-3d-secondary px-3 py-1.5 text-[10px] rounded-lg min-h-0 disabled:opacity-50"
+            >
+              Refresh
+            </button>
+          </div>
+
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or Room ID..."
+              className="input-3d w-full pl-9 pr-4 py-2.5 text-sm"
+            />
+          </div>
+
+          <div className="max-h-72 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+            {roomsLoading ? (
+              <div className="py-8 text-center text-xs text-gray-500 animate-pulse">Loading workspaces...</div>
+            ) : filteredRooms.length === 0 ? (
+              <div className="py-8 text-center text-xs text-gray-500">
+                {searchQuery.trim() ? "No workspaces match your search" : "No workspaces yet — create one to get started"}
+              </div>
+            ) : (
+              filteredRooms.map((room) => (
+                <div
+                  key={room.roomId}
+                  className="w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2.5 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 shrink-0">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}>
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-gray-200 truncate font-medium group-hover:text-white transition-colors">
+                      {room.name}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-gray-600 font-mono truncate">{room.roomId}</span>
+                      {room.createdAt > 0 && (
+                        <span className="text-[10px] text-gray-700 shrink-0">{formatDate(room.createdAt)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRoomClick(room)}
+                    className="btn-3d btn-3d-join shrink-0"
+                  >
+                    Join
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Recent Workspaces */}
         {roomHistory.length > 0 && (
           <div className="glass rounded-xl p-4 space-y-2">
             <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -248,10 +374,9 @@ function LandingContent() {
             </div>
             <div className="space-y-1">
               {roomHistory.map((entry) => (
-                <button
+                <div
                   key={entry.roomId}
-                  onClick={() => handleHistoryClick(entry)}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-left group"
+                  className="w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
                 >
                   <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-300">
                     <ModeIcon mode={entry.disguiseMode} className="w-3.5 h-3.5" />
@@ -260,10 +385,14 @@ function LandingContent() {
                     <div className="text-xs text-gray-200 truncate font-medium">{entry.roomName}</div>
                     <div className="text-[10px] text-gray-600 font-mono truncate">{entry.roomId}</div>
                   </div>
-                  <div className="text-[10px] text-gray-600 group-hover:text-gray-400 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => handleHistoryClick(entry)}
+                    className="btn-3d btn-3d-join shrink-0 min-h-[34px] px-3"
+                  >
                     Join
-                  </div>
-                </button>
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -318,7 +447,7 @@ function LandingContent() {
                 <label className="block text-[11px] font-medium text-gray-400 mb-1">Your Nickname</label>
                 <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g. developer_01"
-                  className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
+                  className="input-3d w-full" />
               </div>
             </div>
             <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
@@ -327,7 +456,7 @@ function LandingContent() {
               <label className="block text-[11px] font-medium text-gray-400 mb-1">Workspace Name</label>
               <input type="text" value={roomName} onChange={(e) => setRoomName(e.target.value)}
                 placeholder="e.g. Auth Service Review"
-                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
+                className="input-3d w-full" />
             </div>
 
             <div>
@@ -337,7 +466,7 @@ function LandingContent() {
               </label>
               <input type="text" value={roomId} onChange={(e) => setRoomId(e.target.value)}
                 placeholder="e.g. auth-review"
-                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all font-mono" />
+                  className="input-3d w-full font-mono" />
               <p className="text-[9px] text-gray-600 mt-1">Share this Room ID with teammates so they can join</p>
             </div>
 
@@ -345,7 +474,7 @@ function LandingContent() {
               <label className="block text-[11px] font-medium text-gray-400 mb-1">Password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                 placeholder="minimum 4 characters"
-                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
+                className="input-3d w-full" />
             </div>
 
             {error && (
@@ -353,7 +482,7 @@ function LandingContent() {
             )}
 
             <button type="submit" disabled={loading}
-              className="w-full py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg text-sm font-medium transition-all disabled:cursor-not-allowed active:scale-[0.98]">
+              className="btn-3d btn-3d-accent w-full py-2.5 text-sm rounded-xl disabled:opacity-50">
               {loading ? "Creating..." : "Create Workspace"}
             </button>
           </form>
@@ -361,8 +490,15 @@ function LandingContent() {
       </Modal>
 
       {/* Join Modal */}
-      <Modal isOpen={showJoinModal} onClose={() => setShowJoinModal(false)} title="Join Workspace">
+      <Modal isOpen={showJoinModal} onClose={() => { setShowJoinModal(false); setSelectedRoomName(""); }} title="Join Workspace">
         <form onSubmit={handleJoin} className="space-y-3">
+          {selectedRoomName && (
+            <div className="glass rounded-lg px-3 py-2.5 border border-white/10">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Workspace</p>
+              <p className="text-sm text-gray-100 font-medium">{selectedRoomName}</p>
+              <p className="text-[10px] text-gray-600 font-mono mt-0.5">{roomId}</p>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => fileInputRef.current?.click()}
               className="relative w-14 h-14 rounded-full overflow-hidden bg-gray-800 border-2 border-dashed border-gray-600 hover:border-blue-500 transition-colors group shrink-0">
@@ -381,26 +517,28 @@ function LandingContent() {
               <label className="block text-[11px] font-medium text-gray-400 mb-1">Your Nickname</label>
               <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
                 placeholder="e.g. developer_02"
-                className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
+                className="input-3d w-full" />
             </div>
           </div>
           <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
 
-          <div>
-            <label className="block text-[11px] font-medium text-gray-400 mb-1">Room ID</label>
-            <input type="text" value={roomId} onChange={(e) => setRoomId(e.target.value)}
-              placeholder="Enter the Room ID (e.g. auth-review-abc123)"
-              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all font-mono" />
-            <p className="text-[9px] text-gray-600 mt-1">
-              Room ID is the code shown when the workspace was created
-            </p>
-          </div>
+          {!selectedRoomName && (
+            <div>
+              <label className="block text-[11px] font-medium text-gray-400 mb-1">Room ID</label>
+              <input type="text" value={roomId} onChange={(e) => setRoomId(e.target.value)}
+                placeholder="Enter the Room ID (e.g. auth-review-abc123)"
+                  className="input-3d w-full font-mono" />
+              <p className="text-[9px] text-gray-600 mt-1">
+                Room ID is the code shown when the workspace was created
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-[11px] font-medium text-gray-400 mb-1">Password</label>
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter the room password"
-              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all" />
+              className="input-3d w-full" />
           </div>
 
           {error && (
@@ -408,7 +546,7 @@ function LandingContent() {
           )}
 
           <button type="submit" disabled={loading}
-            className="w-full py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg text-sm font-medium transition-all disabled:cursor-not-allowed active:scale-[0.98]">
+            className="btn-3d btn-3d-accent w-full py-2.5 text-sm rounded-xl disabled:opacity-50">
             {loading ? "Joining..." : "Join Workspace"}
           </button>
         </form>

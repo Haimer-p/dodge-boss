@@ -1,5 +1,7 @@
 import { Redis } from "@upstash/redis";
-import { ChatMessage, Room } from "./types";
+import { ChatMessage, RoomListItem, TypingUser } from "./types";
+
+const ROOM_INDEX_KEY = "rooms:index";
 
 function getRedis() {
   const url =
@@ -38,6 +40,7 @@ export async function createRoom(
     password: String(password),
     created_at: String(Date.now()),
   });
+  await redis().sadd(ROOM_INDEX_KEY, roomId);
   return true;
 }
 
@@ -54,6 +57,56 @@ export async function verifyRoom(
 export async function roomExists(roomId: string): Promise<boolean> {
   const exists = await redis().exists(`room:${roomId}:meta`);
   return exists === 1;
+}
+
+async function scanRoomIds(): Promise<string[]> {
+  const ids: string[] = [];
+  let cursor = 0;
+
+  do {
+    const [nextCursor, keys] = await redis().scan(cursor, {
+      match: "room:*:meta",
+      count: 100,
+    });
+    cursor = Number(nextCursor);
+    for (const key of keys) {
+      const match = String(key).match(/^room:(.+):meta$/);
+      if (match) ids.push(match[1]);
+    }
+  } while (cursor !== 0);
+
+  if (ids.length > 0) {
+    await redis().sadd(ROOM_INDEX_KEY, ids);
+  }
+
+  return ids;
+}
+
+export async function listRooms(): Promise<RoomListItem[]> {
+  let roomIds = await redis().smembers<string[]>(ROOM_INDEX_KEY);
+
+  if (!roomIds?.length) {
+    roomIds = await scanRoomIds();
+  }
+
+  const rooms: RoomListItem[] = [];
+
+  for (const roomId of roomIds) {
+    const meta = await redis().hgetall<Record<string, string>>(
+      `room:${roomId}:meta`
+    );
+    if (!meta?.name) {
+      await redis().srem(ROOM_INDEX_KEY, roomId);
+      continue;
+    }
+    rooms.push({
+      roomId,
+      name: meta.name,
+      createdAt: Number(meta.created_at) || 0,
+    });
+  }
+
+  return rooms.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 // Message methods
@@ -95,4 +148,61 @@ export async function getMessages(
 // Pub/Sub methods - using notification list pattern for SSE
 export function getChannelName(roomId: string): string {
   return `room:channel:${roomId}`;
+}
+
+function typingKey(roomId: string): string {
+  return `room:${roomId}:typing`;
+}
+
+export async function setTyping(
+  roomId: string,
+  userId: string,
+  username: string
+): Promise<void> {
+  await redis().hset(typingKey(roomId), {
+    [userId]: JSON.stringify({ username, updatedAt: Date.now() }),
+  });
+}
+
+export async function clearTyping(
+  roomId: string,
+  userId: string
+): Promise<void> {
+  await redis().hdel(typingKey(roomId), userId);
+}
+
+export async function getActiveTypers(
+  roomId: string,
+  maxAgeMs = 5000
+): Promise<TypingUser[]> {
+  const raw = await redis().hgetall<Record<string, string>>(typingKey(roomId));
+  if (!raw) return [];
+
+  const now = Date.now();
+  const typers: TypingUser[] = [];
+  const staleIds: string[] = [];
+
+  for (const [uid, value] of Object.entries(raw)) {
+    try {
+      const parsed = typeof value === "string" ? JSON.parse(value) : value;
+      const updatedAt = Number(parsed.updatedAt) || 0;
+      if (now - updatedAt > maxAgeMs) {
+        staleIds.push(uid);
+        continue;
+      }
+      typers.push({
+        userId: uid,
+        username: parsed.username || "Someone",
+        updatedAt,
+      });
+    } catch {
+      staleIds.push(uid);
+    }
+  }
+
+  if (staleIds.length > 0) {
+    await redis().hdel(typingKey(roomId), ...staleIds);
+  }
+
+  return typers;
 }

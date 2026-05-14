@@ -58,5 +58,44 @@ export default function ModeIcon({ mode, className = "w-3.5 h-3.5" }: ModeIconPr
           <line x1="9" y1="3" x2="9" y2="21" />
         </svg>
       );
+    case "email":
+      return (
+        <svg {...props}>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="m2 7 10 7 10-3" />
+          <path d="M2 7v11h20V7" />
+        </svg>
+      );
+    case "dashboard":
+      return (
+        <svg {...props}>
+          <rect x="3" y="3" width="7" height="9" rx="1" />
+          <rect x="14" y="3" width="7" height="5" rx="1" />
+          <rect x="14" y="12" width="7" height="9" rx="1" />
+          <rect x="3" y="16" width="7" height="5" rx="1" />
+        </svg>
+      );
+    case "music":
+      return (
+        <svg {...props}>
+          <path d="M9 18V5l12-2v13" />
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="18" cy="16" r="3" />
+        </svg>
+      );
+    case "youtube":
+      return (
+        <svg {...props}>
+          <rect x="2" y="5" width="20" height="14" rx="3" />
+          <polygon points="10 9 16 12 10 15" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "google":
+      return (
+        <svg {...props}>
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+      );
   }
 }
