@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>2048</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#1a1a2e;color:#eee;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:16px}
+h1{font-size:2rem;margin-bottom:8px}
+.score{font-size:1rem;color:#aaa;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(4,72px);gap:8px;background:#2d2d44;padding:8px;border-radius:8px}
+.cell{width:72px;height:72px;background:#3d3d5c;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700}
+.c2{background:#4a6fa5}.c4{background:#5a7fb5}.c8{background:#c97840;color:#fff}.c16{background:#d48850;color:#fff}
+.c32{background:#e49860;color:#fff}.c64{background:#f0a870;color:#fff;font-size:1.2rem}
+.c128,.c256,.c512,.c1024,.c2048{font-size:1rem;color:#fff}
+.c128{background:#e8c060}.c256{background:#edc870}.c512{background:#f2d880}.c1024{background:#f7e890;color:#333}.c2048{background:#ffe8a0;color:#333}
+p{margin-top:12px;font-size:.75rem;color:#666}
+</style>
+</head>
+<body>
+<h1>2048</h1>
+<div class="score">Score: <span id="score">0</span></div>
+<div class="grid" id="grid"></div>
+<p>Arrow keys or swipe to merge tiles</p>
+<script>
+const gridEl=document.getElementById('grid'),scoreEl=document.getElementById('score');
+let grid=Array.from({length:4},()=>Array(4).fill(0)),score=0;
+function render(){gridEl.innerHTML='';for(let r=0;r<4;r++)for(let c=0;c<4;c++){const v=grid[r][c],d=document.createElement('motion');d.className='cell'+(v?' c'+v:'');d.textContent=v||'';gridEl.appendChild(d)}scoreEl.textContent=score}
+function empty(){const a=[];for(let r=0;r<4;r++)for(let c=0;c<4;c++)if(!grid[r][c])a.push([r,c]);return a}
+function add(){const e=empty();if(!e.length)return;const [r,c]=e[Math.floor(Math.random()*e.length)];grid[r][c]=Math.random()<.9?2:4}
+function slide(row){const f=row.filter(x=>x),m=[];for(let i=0;i<f.length;i++){if(f[i]&&f[i]===f[i+1]){m.push(f[i]*2);score+=f[i]*2;i++}else m.push(f[i]||0)}while(m.length<4)m.push(0);return m}
+function move(dir){const prev=JSON.stringify(grid);const rot=g=>{if(dir==='left')return g;if(dir==='right')return g.map(r=>[...r].reverse());if(dir==='up')return g[0].map((_,i)=>g.map(r=>r[i]));return g[0].map((_,i)=>g.map(r=>r[i]).reverse())}
+const rev=g=>{if(dir==='left'||dir==='up')return g;if(dir==='right')return g.map(r=>[...r].reverse());return g[0].map((_,i)=>g.map(r=>r[i]).reverse())}
+let g=rot(grid);g=g.map(slide);grid=rev(g);if(JSON.stringify(grid)!==prev){add();render();if(!canMove())setTimeout(()=>alert('Game over! Score: '+score),100)}}
+function canMove(){if(empty().length)return true;for(let r=0;r<4;r++)for(let c=0;c<4;c++){const v=grid[r][c];if(c<3&&grid[r][c+1]===v)return true;if(r<3&&grid[r+1][c]===v)return true}return false}
+document.addEventListener('keydown',e=>{const k={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'}[e.key];if(k){e.preventDefault();move(k)}});
+let tx,ty;document.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
+document.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>30)move(dx>0?'right':'left');else if(Math.abs(dy)>30)move(dy>0?'down':'up')},{passive:true});
+add();add();render();
+</script>
+</body>
+</html>

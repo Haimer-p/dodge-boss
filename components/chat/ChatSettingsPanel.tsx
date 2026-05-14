@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChatAppearance } from "@/lib/types";
 import {
   COLOR_SCHEMES,
@@ -14,6 +15,7 @@ interface ChatSettingsPanelProps {
   onChange: (appearance: ChatAppearance) => void;
   isOpen: boolean;
   onClose: () => void;
+  anchorRef: React.RefObject<HTMLElement | null>;
 }
 
 function ColorField({
@@ -49,21 +51,48 @@ export default function ChatSettingsPanel({
   onChange,
   isOpen,
   onClose,
+  anchorRef,
 }: ChatSettingsPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!isOpen || !anchorRef.current) {
+      setPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      if (!anchorRef.current) return;
+      const rect = anchorRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 8,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen, anchorRef]);
 
   useEffect(() => {
     if (!isOpen) return;
     const handleClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        onClose();
-      }
+      const target = e.target as Node;
+      if (panelRef.current?.contains(target)) return;
+      if (anchorRef.current?.contains(target)) return;
+      onClose();
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, anchorRef]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !position) return null;
 
   const update = (patch: Partial<ChatAppearance>) => {
     onChange({ ...appearance, presetId: "custom", ...patch });
@@ -79,10 +108,11 @@ export default function ChatSettingsPanel({
     onChange({ ...DEFAULT_CHAT_APPEARANCE });
   };
 
-  return (
+  const panel = (
     <div
       ref={panelRef}
-      className="absolute bottom-full right-0 mb-2 w-72 glass rounded-xl border border-white/10 shadow-2xl z-50 p-5 animate-fade-slide max-h-[min(80vh,32rem)] overflow-y-auto thin-scrollbar"
+      className="fixed w-72 glass rounded-xl border border-white/10 shadow-2xl z-[200] p-5 animate-fade-slide max-h-[min(80vh,32rem)] overflow-y-auto thin-scrollbar"
+      style={{ top: position.top, right: position.right }}
     >
       <div className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-4">
         Giao diện chat
@@ -174,4 +204,6 @@ export default function ChatSettingsPanel({
       </Button>
     </div>
   );
+
+  return createPortal(panel, document.body);
 }

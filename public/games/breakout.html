@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Breakout</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#111827;color:#f9fafb;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:12px}
+canvas{background:#1f2937;border-radius:8px;border:2px solid #374151;max-width:100%;touch-action:none}
+p{margin-top:8px;font-size:.75rem;color:#9ca3af}
+</style>
+</head>
+<body>
+<canvas id="c" width="480" height="360"></canvas>
+<p>Mouse / touch to move paddle · Score: <span id="s">0</span></p>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d'),scoreEl=document.getElementById('s');
+let W=c.width,H=c.height,paddle={x:W/2-40,w:80,h:10},ball={x:W/2,y:H-40,vx:3,vy:-3,r:6},score=0,bricks=[];
+for(let r=0;r<5;r++)for(let col=0;col<8;col++)bricks.push({x:col*60+10,y:r*22+30,w:55,h:18,hit:false});
+function draw(){x.fillStyle='#1f2937';x.fillRect(0,0,W,H);
+x.fillStyle='#60a5fa';x.fillRect(paddle.x,H-20,paddle.w,paddle.h);
+x.fillStyle='#fbbf24';x.beginPath();x.arc(ball.x,ball.y,ball.r,0,Math.PI*2);x.fill();
+bricks.forEach(b=>{if(!b.hit){x.fillStyle='#34d399';x.fillRect(b.x,b.y,b.w,b.h)}})}
+function step(){ball.x+=ball.vx;ball.y+=ball.vy;
+if(ball.x<ball.r||ball.x>W-ball.r)ball.vx*=-1;
+if(ball.y<ball.r)ball.vy*=-1;
+if(ball.y>H-ball.r){if(ball.x>paddle.x&&ball.x<paddle.x+paddle.w)ball.vy=-Math.abs(ball.vy);else{ball={x:W/2,y:H-40,vx:3,vy:-3,r:6};score=0;scoreEl.textContent=0;bricks.forEach(b=>b.hit=false)}}
+bricks.forEach(b=>{if(!b.hit&&ball.x>b.x&&ball.x<b.x+b.w&&ball.y>b.y&&ball.y<b.y+b.h){b.hit=true;ball.vy*=-1;score+=10;scoreEl.textContent=score}});
+draw();requestAnimationFrame(step)}
+c.addEventListener('mousemove',e=>{const r=c.getBoundingClientRect();paddle.x=Math.max(0,Math.min(W-paddle.w,(e.clientX-r.left)*(W/r.width)-paddle.w/2))});
+c.addEventListener('touchmove',e=>{e.preventDefault();const r=c.getBoundingClientRect(),t=e.touches[0];paddle.x=Math.max(0,Math.min(W-paddle.w,(t.clientX-r.left)*(W/r.width)-paddle.w/2))},{passive:false});
+step();
+</script>
+</body>
+</html>

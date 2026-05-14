@@ -1,6 +1,7 @@
 import { Redis } from "@upstash/redis";
 import { ChatMessage } from "@/lib/types";
 import { getActiveTypers } from "@/lib/redis";
+import { GAME_CHANNELS, readVersion } from "@/lib/game-redis";
 
 const POLL_MS = 500;
 
@@ -35,15 +36,19 @@ export async function GET(req: Request) {
 
   let lastMessageCount = await redis.llen(NOTIFY_KEY);
   let lastTypingSig = "";
-  let lastCaroVersion = 0;
+  const lastGameVersions: Record<string, number> = {};
 
-  const initialCaro = await redis.get<string>(`room:${roomId}:caro`);
-  if (initialCaro) {
-    try {
-      const parsed = typeof initialCaro === "string" ? JSON.parse(initialCaro) : initialCaro;
-      lastCaroVersion = Number(parsed.version) || 0;
-    } catch {
-      lastCaroVersion = 0;
+  for (const channel of GAME_CHANNELS) {
+    const raw = await redis.get<string>(`room:${roomId}:${channel}`);
+    if (raw) {
+      try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        lastGameVersions[channel] = readVersion(parsed);
+      } catch {
+        lastGameVersions[channel] = 0;
+      }
+    } else {
+      lastGameVersions[channel] = 0;
     }
   }
 
@@ -69,11 +74,15 @@ export async function GET(req: Request) {
             for (const item of newItems) {
               try {
                 const data = typeof item === "string" ? JSON.parse(item) : item;
-                if (data?.type === "caro" && data.payload) {
-                  lastCaroVersion = Number(data.payload.version) || lastCaroVersion;
+                if (
+                  data?.type &&
+                  GAME_CHANNELS.includes(data.type) &&
+                  data.payload
+                ) {
+                  lastGameVersions[data.type] = readVersion(data.payload);
                   controller.enqueue(
                     encoder.encode(
-                      `data: ${JSON.stringify({ type: "caro", payload: data.payload })}\n\n`
+                      `data: ${JSON.stringify({ type: data.type, payload: data.payload })}\n\n`
                     )
                   );
                   continue;
@@ -90,16 +99,17 @@ export async function GET(req: Request) {
             }
           }
 
-          const caroRaw = await redis.get<string>(`room:${roomId}:caro`);
-          if (caroRaw) {
+          for (const channel of GAME_CHANNELS) {
+            const raw = await redis.get<string>(`room:${roomId}:${channel}`);
+            if (!raw) continue;
             try {
-              const caroState = typeof caroRaw === "string" ? JSON.parse(caroRaw) : caroRaw;
-              const version = Number(caroState.version) || 0;
-              if (version > lastCaroVersion) {
-                lastCaroVersion = version;
+              const gameState = typeof raw === "string" ? JSON.parse(raw) : raw;
+              const version = readVersion(gameState);
+              if (version > (lastGameVersions[channel] ?? 0)) {
+                lastGameVersions[channel] = version;
                 controller.enqueue(
                   encoder.encode(
-                    `data: ${JSON.stringify({ type: "caro", payload: caroState })}\n\n`
+                    `data: ${JSON.stringify({ type: channel, payload: gameState })}\n\n`
                   )
                 );
               }

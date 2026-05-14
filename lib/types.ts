@@ -33,7 +33,11 @@ export type DisguiseMode =
   | "music"
   | "youtube"
   | "google"
-  | "caro";
+  | "caro"
+  | "arcade"
+  | "chess"
+  | "xiangqi"
+  | "bowling";
 
 export type StealthTheme = "dark" | "light" | "gray";
 
@@ -70,7 +74,10 @@ export type RealtimeEvent =
   | { type: "connected" }
   | { type: "message"; payload: ChatMessage }
   | { type: "typing"; payload: { typers: TypingUser[] } }
-  | { type: "caro"; payload: CaroGameState };
+  | { type: "caro"; payload: CaroGameState }
+  | { type: "chess"; payload: import("./chess-game").ChessGameState }
+  | { type: "xiangqi"; payload: import("./xiangqi").XiangqiGameState }
+  | { type: "bowling"; payload: import("./bowling").BowlingGameState };
 
 export type CaroCell = "" | "X" | "O";
 
