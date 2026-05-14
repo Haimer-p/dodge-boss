@@ -37,7 +37,8 @@ export type DisguiseMode =
   | "arcade"
   | "chess"
   | "xiangqi"
-  | "bowling";
+  | "bowling"
+  | "vocabulary";
 
 export type StealthTheme = "dark" | "light" | "gray";
 

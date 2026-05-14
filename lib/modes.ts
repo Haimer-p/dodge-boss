@@ -11,6 +11,7 @@ export const WORK_MODES: { id: DisguiseMode; label: string }[] = [
   { id: "music", label: "Music" },
   { id: "youtube", label: "YouTube" },
   { id: "google", label: "Google" },
+  { id: "vocabulary", label: "Vocab" },
 ];
 
 export const GAME_MODES: { id: DisguiseMode; label: string }[] = [

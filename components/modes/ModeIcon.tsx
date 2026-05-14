@@ -137,5 +137,12 @@ export default function ModeIcon({ mode, className = "w-3.5 h-3.5" }: ModeIconPr
           <path d="M8 6a4 4 0 0 1 8 0v8a4 4 0 0 1-8 0V6z" />
         </svg>
       );
+    case "vocabulary":
+      return (
+        <svg {...props}>
+          <path d="M4 6h16v2H4V6zm0 5h10v2H4v-2zm0 5h14v2H4v-2z" />
+          <path d="M18 10h2v8h-2v-8z" fill="currentColor" stroke="none" />
+        </svg>
+      );
   }
 }
