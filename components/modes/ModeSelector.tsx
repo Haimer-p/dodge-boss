@@ -19,6 +19,7 @@ const modes: { id: DisguiseMode; label: string }[] = [
   { id: "music", label: "Music" },
   { id: "youtube", label: "YouTube" },
   { id: "google", label: "Google" },
+  { id: "caro", label: "Grid" },
 ];
 
 export default function ModeSelector({ selected, onSelect }: ModeSelectorProps) {

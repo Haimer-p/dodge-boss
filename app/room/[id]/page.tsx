@@ -16,6 +16,7 @@ import DashboardMode from "@/components/modes/DashboardMode";
 import MusicMode from "@/components/modes/MusicMode";
 import YoutubeMode from "@/components/modes/YoutubeMode";
 import GoogleMode from "@/components/modes/GoogleMode";
+import CaroMode from "@/components/modes/CaroMode";
 import PetCompanion from "@/components/ui/PetCompanion";
 import ParticleBackground from "@/components/ui/ParticleBackground";
 import StealthControls from "@/components/ui/StealthControls";
@@ -194,6 +195,14 @@ function RoomContent() {
       case "music": return <MusicMode />;
       case "youtube": return <YoutubeMode />;
       case "google": return <GoogleMode />;
+      case "caro":
+        return (
+          <CaroMode
+            roomId={roomId}
+            userId={session.userId}
+            username={session.username}
+          />
+        );
       default: return <DocumentMode />;
     }
   };

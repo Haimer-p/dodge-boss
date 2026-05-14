@@ -43,6 +43,7 @@ export function getDisguiseLabel(mode: DisguiseMode): string {
     music: "Spotify - Focus Playlist",
     youtube: "YouTube - Tech Tutorials",
     google: "Google Search",
+    caro: "Excel - Team Grid",
   };
   return labels[mode];
 }
@@ -87,6 +88,7 @@ export function getStatusText(mode: DisguiseMode): string {
     music: "Now playing",
     youtube: "Watching",
     google: "Search ready",
+    caro: "Grid active",
   };
   return map[mode];
 }

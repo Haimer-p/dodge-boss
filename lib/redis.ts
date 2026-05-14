@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
-import { ChatMessage, RoomListItem, TypingUser } from "./types";
+import { ChatMessage, RoomListItem, TypingUser, CaroGameState } from "./types";
+import { createInitialCaroState, normalizeCaroState } from "./caro";
 
 const ROOM_INDEX_KEY = "rooms:index";
 
@@ -205,4 +206,28 @@ export async function getActiveTypers(
   }
 
   return typers;
+}
+
+function caroKey(roomId: string): string {
+  return `room:${roomId}:caro`;
+}
+
+export async function getCaroState(roomId: string): Promise<CaroGameState> {
+  const raw = await redis().get<string>(caroKey(roomId));
+  if (!raw) return createInitialCaroState();
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return normalizeCaroState(parsed as CaroGameState);
+  } catch {
+    return createInitialCaroState();
+  }
+}
+
+export async function saveCaroState(
+  roomId: string,
+  state: CaroGameState
+): Promise<void> {
+  const normalized = normalizeCaroState(state);
+  const { board: _legacy, ...clean } = normalized;
+  await redis().set(caroKey(roomId), JSON.stringify(clean));
 }
