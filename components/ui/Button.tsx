@@ -24,7 +24,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         type="button"
-        className={`inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-xs font-medium transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed ${fullWidth ? "w-full" : ""} ${variantClasses[variant]} ${className}`}
+        className={`inline-flex items-center justify-center px-5 py-3 rounded-xl text-xs font-medium transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed ${fullWidth ? "w-full" : ""} ${variantClasses[variant]} ${className}`}
         {...props}
       >
         {children}

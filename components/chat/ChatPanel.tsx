@@ -12,6 +12,7 @@ import MessageInput from "./MessageInput";
 import TypingIndicator from "./TypingIndicator";
 import ChatSettingsPanel from "./ChatSettingsPanel";
 import IconButton from "@/components/ui/IconButton";
+import { createMessage } from "@/lib/utils";
 
 interface ChatPanelProps {
   roomId: string;
@@ -140,14 +141,34 @@ export default function ChatPanel({
   }, [messages, typers]);
 
   const sendMessage = async (content: string, type: "text" | "image" = "text") => {
+    const optimistic = createMessage(userId, username, content, type, avatar);
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === optimistic.id)) return prev;
+      return [...prev, optimistic];
+    });
+
     try {
       await postTyping(false);
-      await fetch("/api/chat/send", {
+      const res = await fetch("/api/chat/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, userId, username, avatar, content, type }),
       });
+      if (!res.ok) {
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+        return;
+      }
+      const data = await res.json();
+      if (data.message) {
+        const confirmed = data.message as ChatMessage;
+        setMessages((prev) => {
+          const withoutOptimistic = prev.filter((m) => m.id !== optimistic.id);
+          if (withoutOptimistic.some((m) => m.id === confirmed.id)) return withoutOptimistic;
+          return [...withoutOptimistic, confirmed];
+        });
+      }
     } catch (error) {
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       console.error("Send failed:", error);
     }
   };
@@ -164,14 +185,14 @@ export default function ChatPanel({
 
   return (
     <div
-      className={`w-full md:w-80 lg:w-96 flex flex-col md:border-l border-white/10 backdrop-blur-md h-full ${className}`}
+      className={`w-full md:w-[22rem] lg:w-[26rem] flex flex-col md:border-l border-white/10 backdrop-blur-md h-full ${className}`}
       style={{
         backgroundColor: appearance.panelBg,
         opacity: appearance.panelOpacity,
         color: appearance.panelText,
       }}
     >
-      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+      <div className="chat-panel-header border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
@@ -207,7 +228,7 @@ export default function ChatPanel({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 thin-scrollbar" style={{ scrollBehavior: "smooth" }}>
+      <div className="flex-1 overflow-y-auto chat-messages thin-scrollbar" style={{ scrollBehavior: "smooth" }}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-3">
