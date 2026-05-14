@@ -38,6 +38,11 @@ export function getDisguiseLabel(mode: DisguiseMode): string {
     terminal: "Terminal - Build Log",
     kanban: "Jira - Sprint Board",
     spreadsheet: "Excel - Data Report",
+    email: "Outlook - Inbox",
+    dashboard: "Grafana - Service Metrics",
+    music: "Spotify - Focus Playlist",
+    youtube: "YouTube - Tech Tutorials",
+    google: "Google Search",
   };
   return labels[mode];
 }
@@ -77,6 +82,11 @@ export function getStatusText(mode: DisguiseMode): string {
     terminal: "PID: 1337",
     kanban: "Sprint: Active",
     spreadsheet: "Sheet 2 of 5",
+    email: "3 unread",
+    dashboard: "Live metrics",
+    music: "Now playing",
+    youtube: "Watching",
+    google: "Search ready",
   };
   return map[mode];
 }

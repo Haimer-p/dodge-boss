@@ -1,8 +1,13 @@
 import { Redis } from "@upstash/redis";
 import { ChatMessage } from "@/lib/types";
+import { getActiveTypers } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+function typersSignature(typers: { userId: string; updatedAt: number }[]): string {
+  return typers.map((t) => `${t.userId}:${t.updatedAt}`).sort().join("|");
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -27,10 +32,10 @@ export async function GET(req: Request) {
   const NOTIFY_KEY = `room:${roomId}:notify`;
 
   let lastMessageCount = await redis.llen(NOTIFY_KEY);
+  let lastTypingSig = "";
 
   const stream = new ReadableStream({
     async start(controller) {
-      // Send initial connection event
       controller.enqueue(
         encoder.encode(`data: ${JSON.stringify({ type: "connected" })}\n\n`)
       );
@@ -40,7 +45,6 @@ export async function GET(req: Request) {
           const currentCount = await redis.llen(NOTIFY_KEY);
 
           if (currentCount > lastMessageCount) {
-            // New messages available, get them
             const newItems = await redis.lrange(
               NOTIFY_KEY,
               lastMessageCount,
@@ -61,12 +65,22 @@ export async function GET(req: Request) {
               }
             }
           }
+
+          const typers = await getActiveTypers(roomId);
+          const sig = typersSignature(typers);
+          if (sig !== lastTypingSig) {
+            lastTypingSig = sig;
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ type: "typing", payload: { typers } })}\n\n`
+              )
+            );
+          }
         } catch {
           // continue polling
         }
-      }, 1500); // Poll every 1.5 seconds for near-realtime
+      }, 1500);
 
-      // Keep-alive to prevent connection timeout
       const keepAlive = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(": keepalive\n\n"));
