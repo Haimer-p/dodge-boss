@@ -17,6 +17,7 @@ export default function MessageInput({ onSend, onTypingChange, disabled }: Messa
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isTypingRef = useRef(false);
+  const isSendingRef = useRef(false);
 
   const stopTyping = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -72,19 +73,32 @@ export default function MessageInput({ onSend, onTypingChange, disabled }: Messa
     startTyping();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!content.trim()) return;
+  const submitMessage = useCallback(() => {
+    const trimmed = content.trim();
+    if (!trimmed || disabled || isSendingRef.current) return;
+
+    isSendingRef.current = true;
     stopTyping();
     setShowEmoji(false);
-    onSend(content.trim());
+    onSend(trimmed);
     setContent("");
+
+    queueMicrotask(() => {
+      isSendingRef.current = false;
+    });
+  }, [content, disabled, onSend, stopTyping]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitMessage();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing || e.key === "Process") return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      e.stopPropagation();
+      submitMessage();
     }
   };
 
@@ -166,7 +180,8 @@ export default function MessageInput({ onSend, onTypingChange, disabled }: Messa
         </div>
 
         <button
-          type="submit"
+          type="button"
+          onClick={submitMessage}
           disabled={disabled || !content.trim()}
           aria-label="Send message"
           className="inline-flex items-center justify-center min-w-10 min-h-10 p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:opacity-40 transition-all active:scale-95"

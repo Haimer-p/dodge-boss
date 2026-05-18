@@ -97,7 +97,7 @@ export interface CaroPlayer {
   symbol: "X" | "O";
 }
 
-export type CaroStatus = "waiting" | "playing" | "finished";
+export type CaroStatus = "waiting" | "practice" | "playing" | "finished";
 
 export interface CaroGameState {
   version: number;

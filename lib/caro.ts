@@ -33,24 +33,34 @@ export function createInitialCaroState(): CaroGameState {
 
 /** Convert legacy fixed 15×15 board saves to sparse stones. */
 export function normalizeCaroState(state: CaroGameState): CaroGameState {
+  let next: CaroGameState;
+
   if (state.stones && typeof state.stones === "object") {
-    return state;
-  }
-
-  const stones: CaroStones = {};
-  const legacy = state.board;
-  if (legacy) {
-    legacy.forEach((row, r) => {
-      row.forEach((cell, c) => {
-        if (cell === "X" || cell === "O") {
-          stones[stoneKey(r, c)] = cell;
-        }
+    next = { ...state, stones: state.stones };
+  } else {
+    const stones: CaroStones = {};
+    const legacy = state.board;
+    if (legacy) {
+      legacy.forEach((row, r) => {
+        row.forEach((cell, c) => {
+          if (cell === "X" || cell === "O") {
+            stones[stoneKey(r, c)] = cell;
+          }
+        });
       });
-    });
+    }
+    const { board: _board, ...rest } = state;
+    next = { ...rest, stones };
   }
 
-  const { board: _board, ...rest } = state;
-  return { ...rest, stones };
+  if (next.players.length === 2 && next.status === "waiting") {
+    return { ...next, status: "playing" };
+  }
+  if (next.players.length === 1 && next.status === "waiting") {
+    return { ...next, status: "practice" };
+  }
+
+  return next;
 }
 
 export function getPlayerSymbol(
@@ -74,11 +84,14 @@ export function joinCaroGame(
     { userId, username, symbol },
   ];
 
+  const status =
+    players.length === 2 ? "playing" : players.length === 1 ? "practice" : "waiting";
+
   return {
     ...state,
     version: state.version + 1,
     players,
-    status: players.length === 2 ? "playing" : "waiting",
+    status,
     updatedAt: Date.now(),
   };
 }
@@ -131,13 +144,27 @@ export function applyCaroMove(
   row: number,
   col: number
 ): { state: CaroGameState; error?: string } {
-  if (state.status !== "playing") {
+  if (state.status !== "playing" && state.status !== "practice") {
     return { state, error: "Game is not in progress" };
   }
 
-  const symbol = getPlayerSymbol(state, userId);
-  if (!symbol) return { state, error: "You are not in this game" };
-  if (state.currentTurn !== symbol) return { state, error: "Not your turn" };
+  const inGame = state.players.some((p) => p.userId === userId);
+  if (!inGame) return { state, error: "You are not in this game" };
+
+  let symbol: "X" | "O";
+  if (state.status === "practice") {
+    if (state.players.length !== 1) {
+      return { state, error: "Practice mode requires a solo session" };
+    }
+    symbol = state.currentTurn;
+  } else {
+    const playerSymbol = getPlayerSymbol(state, userId);
+    if (!playerSymbol) return { state, error: "You are not in this game" };
+    if (state.currentTurn !== playerSymbol) {
+      return { state, error: "Not your turn" };
+    }
+    symbol = playerSymbol;
+  }
   if (
     !Number.isInteger(row) ||
     !Number.isInteger(col) ||
@@ -172,11 +199,18 @@ export function applyCaroMove(
 }
 
 export function resetCaroGame(state: CaroGameState): CaroGameState {
+  const status =
+    state.players.length === 2
+      ? "playing"
+      : state.players.length === 1
+        ? "practice"
+        : "waiting";
+
   return {
     ...createInitialCaroState(),
     version: state.version + 1,
     players: state.players,
-    status: state.players.length === 2 ? "playing" : "waiting",
+    status,
     updatedAt: Date.now(),
   };
 }

@@ -107,13 +107,29 @@ function LandingContent() {
     return true;
   };
 
-  const createSession = (rid: string) => {
-    const userId = crypto.randomUUID();
+  const storeSession = async (rid: string) => {
+    const res = await fetch("/api/room/resolve-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roomId: rid,
+        username: username.trim(),
+        avatar: avatar ?? undefined,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Could not resolve user");
+    }
     sessionStorage.setItem(
       `chat:session:${rid}`,
-      JSON.stringify({ username, userId, avatar, disguiseMode })
+      JSON.stringify({
+        username: data.username,
+        userId: data.userId,
+        avatar: data.avatar ?? avatar,
+        disguiseMode,
+      })
     );
-    return userId;
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -156,7 +172,7 @@ function LandingContent() {
 
       // Save to history
       saveRoomToHistory(generatedId, roomName, disguiseMode);
-      createSession(generatedId);
+      await storeSession(generatedId);
 
       // Show room info briefly before redirect
       setCreatedRoomInfo({ id: generatedId, password });
@@ -199,7 +215,7 @@ function LandingContent() {
       }
 
       saveRoomToHistory(roomId.trim(), data.roomName || selectedRoomName || roomId.trim(), disguiseMode);
-      createSession(roomId.trim());
+      await storeSession(roomId.trim());
       router.push(`/room/${roomId.trim()}?mode=${disguiseMode}`);
     } catch {
       setError("Failed to join workspace. Please try again.");
