@@ -25,3 +25,9 @@ export const GAME_MODES: { id: DisguiseMode; label: string }[] = [
 export function isGameMode(mode: DisguiseMode): boolean {
   return GAME_MODES.some((g) => g.id === mode);
 }
+
+export function getModeShortLabel(mode: DisguiseMode): string {
+  const found =
+    WORK_MODES.find((m) => m.id === mode) ?? GAME_MODES.find((m) => m.id === mode);
+  return found?.label ?? mode;
+}

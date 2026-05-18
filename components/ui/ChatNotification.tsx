@@ -67,6 +67,9 @@ function ToastCard({
         </div>
       )}
       <div className="flex-1 min-w-0">
+        <p className="text-[10px] uppercase tracking-wide text-blue-300/90 font-medium">
+          Tin nhắn mới
+        </p>
         <p className="text-xs font-semibold text-gray-100 truncate">{message.username}</p>
         <p className="text-[11px] text-gray-400 truncate mt-0.5">{preview}</p>
       </div>

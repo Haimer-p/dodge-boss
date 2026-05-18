@@ -23,7 +23,7 @@ interface ChatPanelProps {
   avatar?: string;
   className?: string;
   isChatVisible?: boolean;
-  onIncomingMessage?: (msg: ChatMessage) => void;
+  onIncomingMessage?: (msg: ChatMessage, meta: { isNearBottom: boolean }) => void;
   onTypingUpdate?: (typers: TypingUser[]) => void;
 }
 
@@ -46,9 +46,12 @@ export default function ChatPanel({
   const [showSettings, setShowSettings] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const settingsAnchorRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const isChatVisibleRef = useRef(isChatVisible);
+  const isNearBottomRef = useRef(true);
+  const [pendingNewCount, setPendingNewCount] = useState(0);
 
   useEffect(() => {
     isChatVisibleRef.current = isChatVisible;
@@ -143,12 +146,16 @@ export default function ChatPanel({
 
         const msg = (data.type === "message" ? data.payload : data) as ChatMessage;
         if (msg.id && msg.content) {
+          const isFromOthers = msg.userId !== userId;
           setMessages((prev) => {
             if (prev.some((m) => m.id === msg.id)) return prev;
             return [...prev, msg];
           });
-          if (msg.userId !== userId && !isChatVisibleRef.current) {
-            onIncomingMessage?.(msg);
+          if (isFromOthers) {
+            if (!isNearBottomRef.current) {
+              setPendingNewCount((n) => n + 1);
+            }
+            onIncomingMessage?.(msg, { isNearBottom: isNearBottomRef.current });
           }
         }
       } catch {}
@@ -185,9 +192,27 @@ export default function ChatPanel({
     };
   }, [connectSSE, postTyping, postPresence]);
 
+  const checkNearBottom = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return true;
+    const threshold = 80;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    isNearBottomRef.current = near;
+    if (near) setPendingNewCount(0);
+    return near;
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+    isNearBottomRef.current = true;
+    setPendingNewCount(0);
+  }, []);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typers]);
+    if (checkNearBottom()) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, typers, checkNearBottom]);
 
   const sendMessage = async (content: string, type: "text" | "image" = "text") => {
     const optimistic = createMessage(userId, username, content, type, avatar);
@@ -247,6 +272,11 @@ export default function ChatPanel({
           </svg>
           <span className="text-base font-semibold">Chat</span>
           <span className="text-xs opacity-60">({messages.length})</span>
+          {pendingNewCount > 0 && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-500/90 text-white animate-pulse">
+              +{pendingNewCount}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <MembersPanel
@@ -290,13 +320,16 @@ export default function ChatPanel({
         </div>
       </div>
 
-      <div
-        className="flex-1 overflow-y-auto chat-messages thin-scrollbar"
-        style={{
-          scrollBehavior: "smooth",
-          backgroundColor: withOpacity(appearance.messagesBg, appearance.panelOpacity),
-        }}
-      >
+      <div className="flex-1 relative min-h-0 flex flex-col">
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto chat-messages thin-scrollbar"
+          onScroll={checkNearBottom}
+          style={{
+            scrollBehavior: "smooth",
+            backgroundColor: withOpacity(appearance.messagesBg, appearance.panelOpacity),
+          }}
+        >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-3">
@@ -317,6 +350,20 @@ export default function ChatPanel({
           />
         ))}
         <div ref={messagesEndRef} />
+        </div>
+
+        {pendingNewCount > 0 && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom()}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium shadow-lg shadow-blue-900/40 border border-blue-400/30 animate-fade-slide"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M12 5v14M5 12l7 7 7-7" />
+            </svg>
+            {pendingNewCount === 1 ? "1 tin nhắn mới" : `${pendingNewCount} tin nhắn mới`}
+          </button>
+        )}
       </div>
 
       <TypingIndicator names={typers.map((t) => t.username)} />
