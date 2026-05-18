@@ -14,6 +14,15 @@ import BackButton from "@/components/ui/BackButton";
 
 const CELL_PX = 34;
 const PAN_STEP = Math.floor(CARO_VIEW_EXPAND / 2);
+const MOBILE_VIEW_SIZE = 21;
+
+function viewportForDevice(): ReturnType<typeof initialViewport> {
+  if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+    const half = Math.floor(MOBILE_VIEW_SIZE / 2);
+    return { originRow: -half, originCol: -half, size: MOBILE_VIEW_SIZE };
+  }
+  return initialViewport();
+}
 
 interface CaroModeProps {
   roomId: string;
@@ -26,7 +35,7 @@ export default function CaroMode({ roomId, userId, username }: CaroModeProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
-  const [viewport, setViewport] = useState(initialViewport);
+  const [viewport, setViewport] = useState(viewportForDevice);
   const joinedRef = useRef(false);
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -100,17 +109,23 @@ export default function CaroMode({ roomId, userId, username }: CaroModeProps) {
   }, [state?.stones, state?.lastMove, state?.version]);
 
   const mySymbol = state ? getPlayerSymbol(state, userId) : null;
+  const inGame = state?.players.some((p) => p.userId === userId) ?? false;
+  const isSpectator = state !== null && state.players.length >= 2 && !inGame;
+  const isPractice = state?.status === "practice";
   const isMyTurn =
-    state?.status === "playing" &&
-    mySymbol !== null &&
-    state.currentTurn === mySymbol;
+    inGame &&
+    !isSpectator &&
+    ((state?.status === "playing" &&
+      mySymbol !== null &&
+      state.currentTurn === mySymbol) ||
+      (isPractice && state.players.length === 1));
 
   const opponent = state?.players.find((p) => p.userId !== userId);
   const stones = state?.stones ?? {};
   const stoneCount = Object.keys(stones).length;
 
   const handleCellClick = (row: number, col: number) => {
-    if (!isMyTurn) return;
+    if (!isMyTurn || getStone(stones, row, col)) return;
     postAction("move", { row, col });
   };
 
@@ -125,7 +140,7 @@ export default function CaroMode({ roomId, userId, username }: CaroModeProps) {
 
   const centerBoard = () => {
     if (!state) return;
-    setViewport(computeViewport(initialViewport(), stones, state.lastMove));
+    setViewport(computeViewport(viewportForDevice(), stones, state.lastMove));
     boardRef.current?.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
@@ -167,7 +182,7 @@ export default function CaroMode({ roomId, userId, username }: CaroModeProps) {
             type="button"
             onClick={() => {
               postAction("reset");
-              setViewport(initialViewport());
+              setViewport(viewportForDevice());
             }}
             className="btn-3d btn-3d-secondary px-3 py-2 text-xs rounded-xl min-h-[36px]"
           >
@@ -186,20 +201,28 @@ export default function CaroMode({ roomId, userId, username }: CaroModeProps) {
       )}
 
       <div className="px-4 py-2.5 bg-[#1a1a1a] border-b border-gray-800 flex flex-wrap items-center gap-3 text-xs shrink-0">
-        <span className="text-gray-500">Status:</span>
+        <span className="text-gray-500">Trạng thái:</span>
         {state?.status === "waiting" && (
-          <span className="text-yellow-400">Waiting for opponent…</span>
+          <span className="text-yellow-400">Đang chờ người chơi tham gia…</span>
+        )}
+        {isPractice && (
+          <span className="text-amber-300 font-medium">
+            Chơi thử 1 người — lượt {state.currentTurn}
+          </span>
         )}
         {state?.status === "playing" && (
           <span className={isMyTurn ? "text-green-400 font-medium" : "text-gray-400"}>
             {isMyTurn
-              ? "Your turn"
-              : `${state.currentTurn === "X" ? "Player X" : "Player O"}'s turn`}
+              ? "Đến lượt bạn"
+              : `Lượt ${state.currentTurn === "X" ? "X" : "O"}`}
           </span>
+        )}
+        {isSpectator && (
+          <span className="text-gray-400">Phòng đã đủ 2 người — bạn đang xem</span>
         )}
         {state?.status === "finished" && state.winner && (
           <span className="text-green-400 font-medium">
-            {state.winner === mySymbol ? "You win!" : `${state.winner} wins`}
+            {state.winner === mySymbol ? "Bạn thắng!" : `${state.winner} thắng`}
           </span>
         )}
         <span className="text-gray-600">
@@ -218,6 +241,12 @@ export default function CaroMode({ roomId, userId, username }: CaroModeProps) {
         ))}
         {opponent && <span className="text-gray-600">vs {opponent.username}</span>}
       </div>
+
+      {isPractice && (
+        <div className="px-4 py-2 text-xs text-amber-200/90 bg-amber-500/10 border-b border-amber-500/20">
+          Mời thêm 1 người vào phòng để chơi đối kháng. Hiện bạn có thể đánh thử trên bàn cờ (X và O luân phiên).
+        </div>
+      )}
 
       {error && (
         <div className="px-4 py-2 text-xs text-red-400 bg-red-500/10 border-b border-red-500/20">
@@ -276,7 +305,7 @@ export default function CaroMode({ roomId, userId, username }: CaroModeProps) {
                     type="button"
                     disabled={!canPlay}
                     onClick={() => handleCellClick(row, col)}
-                    className={`caro-cell border border-[#2d5a3d]/60 flex items-center justify-center transition-colors ${
+                    className={`caro-cell border border-[#2d5a3d]/60 flex items-center justify-center transition-colors touch-manipulation ${
                       isWin
                         ? "bg-yellow-500/30 ring-1 ring-yellow-400/60"
                         : isLast
@@ -304,7 +333,15 @@ export default function CaroMode({ roomId, userId, username }: CaroModeProps) {
         <span>
           Origin ({originRow}, {originCol}) · scroll or pan to explore
         </span>
-        <span>{mySymbol ? `You are ${mySymbol}` : "Joining…"}</span>
+        <span>
+          {isSpectator
+            ? "Khán giả"
+            : isPractice
+              ? "Chơi thử (X ↔ O)"
+              : mySymbol
+                ? `Bạn là ${mySymbol}`
+                : "Đang vào phòng…"}
+        </span>
       </div>
     </div>
   );

@@ -77,7 +77,6 @@ function RoomContent() {
     }
 
     const parsed = JSON.parse(stored) as RoomSession;
-    setSession({ ...parsed, roomId });
 
     const mode = (searchParams.get("mode") as DisguiseMode) || "document";
     setDisguiseMode(mode);
@@ -88,6 +87,36 @@ function RoomContent() {
     if (savedTheme) setStealthTheme(savedTheme as StealthTheme);
 
     requestNotificationPermission();
+
+    (async () => {
+      try {
+        const res = await fetch("/api/room/resolve-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            roomId,
+            username: parsed.username,
+            avatar: parsed.avatar,
+          }),
+        });
+        const data = await res.json();
+        const sessionData: RoomSession = res.ok
+          ? {
+              ...parsed,
+              roomId,
+              userId: data.userId,
+              username: data.username,
+              avatar: data.avatar ?? parsed.avatar,
+              disguiseMode: parsed.disguiseMode ?? mode,
+            }
+          : { ...parsed, roomId, disguiseMode: parsed.disguiseMode ?? mode };
+
+        sessionStorage.setItem(`chat:session:${roomId}`, JSON.stringify(sessionData));
+        setSession(sessionData);
+      } catch {
+        setSession({ ...parsed, roomId, disguiseMode: parsed.disguiseMode ?? mode });
+      }
+    })();
   }, [roomId, searchParams, router]);
 
   const handleModeChange = (mode: DisguiseMode) => {
