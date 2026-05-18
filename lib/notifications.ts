@@ -8,14 +8,39 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   return Notification.requestPermission();
 }
 
+let audioCtx: AudioContext | null = null;
+
+export function playNewMessageSound(): void {
+  if (typeof window === "undefined") return;
+  try {
+    audioCtx ??= new AudioContext();
+    if (audioCtx.state === "suspended") void audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 784;
+    osc.type = "sine";
+    const t = audioCtx.currentTime;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  } catch {
+    // ignore
+  }
+}
+
 export function showBrowserNotification(
   title: string,
   body: string,
-  onClick?: () => void
+  onClick?: () => void,
+  options?: { onlyWhenHidden?: boolean }
 ): void {
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
-  if (!document.hidden) return;
+  if (options?.onlyWhenHidden !== false && !document.hidden) return;
 
   try {
     const n = new Notification(title, {

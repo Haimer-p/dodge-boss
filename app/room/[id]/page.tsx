@@ -32,6 +32,7 @@ import {
   requestNotificationPermission,
   showBrowserNotification,
   previewMessage,
+  playNewMessageSound,
 } from "@/lib/notifications";
 
 function RoomContent() {
@@ -141,19 +142,29 @@ function RoomContent() {
     username: session.username,
     avatar: session.avatar,
     isChatVisible,
-    onIncomingMessage: (msg: ChatMessage) => {
+    onIncomingMessage: (msg: ChatMessage, meta: { isNearBottom: boolean }) => {
       if (msg.userId === session.userId) return;
+      const shouldAlert = !isChatVisible || !meta.isNearBottom;
+      if (!shouldAlert) return;
+
       setNewMessageCount((n) => n + 1);
       setToasts((prev) => [...prev, { id: msg.id, message: msg }].slice(-3));
+      playNewMessageSound();
+
       const preview = previewMessage(msg.content, msg.type);
-      showBrowserNotification(msg.username, preview, () => {
-        if (isMobile) setMobileTab("chat");
-        else {
-          setShowChat(true);
-          setIsChatMinimized(false);
-        }
-        setNewMessageCount(0);
-      });
+      showBrowserNotification(
+        `${msg.username} · ${roomId}`,
+        preview,
+        () => {
+          if (isMobile) setMobileTab("chat");
+          else {
+            setShowChat(true);
+            setIsChatMinimized(false);
+          }
+          setNewMessageCount(0);
+        },
+        { onlyWhenHidden: true }
+      );
     },
     onTypingUpdate: (typers: TypingUser[]) => setRemoteTypers(typers),
   };
@@ -166,6 +177,7 @@ function RoomContent() {
       setIsChatMinimized(false);
     }
     setNewMessageCount(0);
+    setToasts([]);
   };
 
   const toggleChat = () => {
@@ -322,7 +334,7 @@ function RoomContent() {
       </header>
 
       {isMobile && mobileTab === "workspace" && (
-        <div className="shrink-0 px-2 py-2 bg-gray-900/70 border-b border-gray-800/80 overflow-x-auto z-20" style={getStealthStyles()}>
+        <div className="shrink-0 px-3 py-2.5 bg-gray-900/90 border-b border-gray-800/80 z-30" style={getStealthStyles()}>
           <ModeSelector selected={disguiseMode} onSelect={handleModeChange} />
         </div>
       )}
